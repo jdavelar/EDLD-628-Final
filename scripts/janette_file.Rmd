@@ -1,0 +1,19 @@
+---
+title: "janette_file"
+author: "Janette Avelar"
+date: '2023-03-02'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(here)
+library(tidyverse)
+library(import)
+library(rio)
+
+nom_2018 <-import(here("data", "nominations_2019-20.csv"))
+  
+survey_2018 <- 
+```
+
