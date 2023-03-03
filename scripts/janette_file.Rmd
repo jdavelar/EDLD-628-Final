@@ -14,6 +14,6 @@ library(rio)
 
 nom_2018 <-import(here("data", "nominations_2019-20.csv"))
   
-survey_2018 <- 
+survey_2018 <- import(here("data", "schools_2019-20.csv"))
 ```
 
