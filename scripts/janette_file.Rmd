@@ -9,11 +9,240 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 library(here)
 library(tidyverse)
-library(import)
 library(rio)
+#all survey data
+survey_2019 <- import(here("data", "schools_2018-19.csv"))
+survey_2021a <- import(here("data", "schools_2020-21a.csv"))
+survey_2021b <- import(here("data", "schools_2020-21b.csv"))
+survey_2021c <- import(here("data", "schools_2020-21c.csv"))
+survey_2022 <- import(here("data", "schools_2021-22.csv"))
+```
 
-nom_2018 <-import(here("data", "nominations_2019-20.csv"))
-  
-survey_2018 <- import(here("data", "schools_2019-20.csv"))
+Variables of interest:
+* FRPL percent  
+* BIPOC percent  
+* Geographic locale  
+* Year  
+* Wave  
+* 9 Tags (see below)
+
+*We identified within that document the following tags- We are highlighting in light green the tags that are within that Ed justice and holistic student support cluster 1. There are 9 found within the cluster that are found across years. *
+* Culturally responsive practices  
+* Assessment for social-emotional learning  
+* Family and community support services  
+* Mental health services  
+* Restorative practices  
+* Designed to meet the students who have been marginalized  
+* SEL curriculum  
+* SEL integration school wide  
+* Reallocation of school services 
+
+
+# Clean 2018-19 Data
+*Note* I named all datasets by the ending year. AY 2018-19 is now considered 2019, AY 2020-21 is now considered 2021, and AY 2021-22 is now considered 2022.
+
+```{r subset 2019}
+#Subset to relevant variables + NCES ID (key for merging)
+merge_2019 <- survey_2019 %>% 
+  select(nces_id, school_id, school_name, school_state, culturally_relevant, measures_sel, community_support, mental_health, restorative_practice, design_margins, sel_curriculum, sel_integrated, reallocation_resources, asian_percent, hispanic_percent, black_percent, white_percent, multiple_races_percent, hawaiian_native_percent, native_percent, locale, FRPL_percent) %>% 
+  rename_at(vars(5:13), function(x){paste0("practices_", x)}) %>% 
+  janitor::clean_names() %>% 
+  # create BIPOC percent variable
+  mutate_at(vars(ends_with("_percent")), str_remove_all, "%") %>% 
+  mutate_at(vars(ends_with("_percent")), as.numeric) %>% 
+  mutate(bipoc_percent = 100 - white_percent) %>% 
+  select(!c(asian_percent, hispanic_percent, black_percent, white_percent, multiple_races_percent, hawaiian_native_percent, native_percent)) %>% 
+  # add year and wave columns
+  mutate(year = rep(2019, 173),
+         wave = rep(1, 173)) %>% 
+  # fill in not tagged **************NOT WORKING************
+  mutate_at(vars(starts_with("practices_")), replace_na, 0)
+#will need to double check that practices names match over time
+#also need to pull in 0s for not tagged (I think it's currently NAs)
+```
+
+# Merge & Clean 2020-21 Data
+
+*Notes:*
+* Some practice names changed between 2019 and 2021 **need to mod before merging**  
+* Wave coded as `2` for all in 2021 for ease, but can distinguish between waves 2 & 3 if needed
+
+```{r}
+# Prep each subset individually, then merge for one single dataset
+# 2021 part 1
+merge_2021a <- survey_2021a %>% 
+  select(NCES_id, school_id, school_name, school_state, culturally_relevant, assessments_sel, community_supports, mental_health, restorative_practice, design_equity, sel_curriculum, sel_integrated, reallocation_resources, white_percent, locale, FRPL_percent) %>% 
+  janitor::clean_names() %>% 
+  #rename variables first
+  rename_at(vars(5:13), function(x){paste0("practices_", x)}) %>% 
+  #empty practices = 0 and time implemented = 1
+  mutate_at(vars(starts_with("practices_")), function(x){case_when(x == "" ~ 0,
+                                                                   x == 1 ~ 1,
+                                                                   x != 0 & x != 1 ~ 1)}) %>% 
+  #create BIPOC percent ***********can pull into custom function*************
+  mutate_at(vars(ends_with("_percent")), str_remove_all, "%") %>% 
+  mutate_at(vars(ends_with("_percent")), as.numeric) %>% 
+  mutate(bipoc_percent = 100 - white_percent) %>% 
+  select(!white_percent) %>% 
+  #create wave and year columns
+  mutate(year = rep(2021, 144),
+         wave = rep(2, 144))
+
+# 2021 part 2
+merge_2021b <- survey_2021b %>% 
+  select(NCES_id, school_id, school_name, school_state, culturally_relevant, assessments_sel, community_supports, mental_health, restorative_practice, design_equity, sel_curriculum, sel_integrated, reallocation_resources, white_percent, locale, FRPL_percent) %>% 
+  janitor::clean_names() %>% 
+  #rename variables first
+  rename_at(vars(5:13), function(x){paste0("practices_", x)}) %>% 
+  #empty practices = 0 and time implemented = 1
+  mutate_at(vars(starts_with("practices_")), function(x){case_when(x == "" ~ 0,
+                                                                   x == 1 ~ 1,
+                                                                   x != 0 & x != 1 ~ 1)}) %>% 
+  #create BIPOC percent ***********can pull into custom function*************
+  mutate_at(vars(ends_with("_percent")), str_remove_all, "%") %>% 
+  mutate_at(vars(ends_with("_percent")), as.numeric) %>% 
+  mutate(bipoc_percent = 100 - white_percent) %>% 
+  select(!white_percent) %>% 
+    #create wave and year columns
+  mutate(year = rep(2021, 88),
+         wave = rep(2, 88))
+
+#2021 part 3
+# I believe this one does not need to be added - it was 2 waves, with the final survey checking up on COVID-specific practices
+# will need to verify
+
+# merge A & B
+merge_2021 <- merge_2021a %>% 
+  full_join(merge_2021b, by = c("nces_id", "school_id", "school_name", "school_state", "practices_culturally_relevant", "practices_assessments_sel", "practices_community_supports", "practices_mental_health", "practices_restorative_practice", "practices_design_equity", "practices_sel_curriculum", "practices_sel_integrated", "practices_reallocation_resources", "locale", "frpl_percent", "bipoc_percent", "year", "wave"))
+```
+
+# Subset 2022 Data
+
+```{r subset 2022}
+merge_2022 <- survey_2022 %>% 
+  select(nces_id, school_id, school_name, school_state, practices_culturally_responsive, practices_assessments_sel, practices_community_supports, practices_mental_health, practices_restorative, practices_design_marginalized, practices_sel_curriculum, practices_sel_integrated, practices_reallocation_resources, white_percent, locale, frpl_percent) %>% 
+  #create bipoc percent
+  mutate(bipoc_percent = 100*(1 - white_percent)) %>% 
+  select(!white_percent) %>% 
+  #standardize frpl
+  mutate(frpl_percent = frpl_percent*100,
+   #create year and wave cols        
+         year = rep(2022, 161),
+         wave = rep(3, 161))
+```
+
+# Prep for merging
+
+Current practice names:  
+* Culturally responsive practices  
+** 2019: `practices_culturally_relevant`  
+** 2021: `practices_culturally_relevant`  
+** 2022: `practices_culturally_responsive`  
+*New var name*: `prac_culture`  
+
+* Assessment for social-emotional learning  
+** 2019: `practices_measures_sel`  
+** 2021: `practices_assessments_sel`  
+** 2022: `practices_assessments_sel`  
+*New var name*: `prac_sel_assess`
+
+* Family and community support services  
+** 2019: `practices_community_support`  
+** 2021: `practices_community_supports`  
+** 2022: `practices_community_supports`  
+*New var name*: `prac_community`
+
+* Mental health services  
+** 2019: `practices_mental_health`  
+** 2021: `practices_mental_health`  
+** 2022: `practices_mental_health`  
+*New var name*: `prac_mental`
+
+* Restorative practices 
+** 2019: `practices_restorative_practice`  
+** 2021: `practices_restorative_practice`  
+** 2022: `practices_restorative`  
+*New var name*: `prac_restorative`  
+
+* Designed to meet the students who have been marginalized  
+** 2019: `practices_design_margins`  
+** 2021: `practices_design_equity`  
+** 2022: `practices_design_marginalized`  
+*New var name* `prac_marginalized`  
+
+* SEL curriculum  
+** 2019: `practices_sel_curriculum`  
+** 2021: `practices_sel_curriculum`  
+** 2022: `practices_sel_curriculum`  
+*New var name*: `prac_sel_curriculum`  
+
+* SEL integration school wide  
+** 2019: `practices_sel_integrated`  
+** 2021: `practices_sel_integrated`  
+** 2022: `practices_sel_integrated`  
+*New var name*: `prac_sel_integrated`
+
+* Reallocation of school services
+** 2019: `practices_reallocation_resources`  
+** 2021: `practices_reallocation_resources`  
+** 2022: `practices_reallocation_resources`  
+*New var name*: `prac_resources`  
+
+```{r merge prep}
+#rename 2019
+merge_2019 <- merge_2019 %>% 
+  rename(
+   "prac_culture" = practices_culturally_relevant,
+   "prac_sel_assess" = practices_measures_sel,
+   "prac_community" =  practices_community_support,
+   "prac_mental" = practices_mental_health,
+   "prac_restorative" = practices_restorative_practice,
+   "prac_marginalized" = practices_design_margins,
+   "prac_sel_curriculum" = practices_sel_curriculum,
+   "prac_sel_integrated" = practices_sel_integrated,
+   "prac_resources" = practices_reallocation_resources
+  )
+# rename 2021
+merge_2021 <- merge_2021 %>% 
+  rename(
+   "prac_culture" = practices_culturally_relevant,
+   "prac_sel_assess" = practices_assessments_sel,
+   "prac_community" =  practices_community_supports,
+   "prac_mental" = practices_mental_health,
+   "prac_restorative" = practices_restorative_practice,
+   "prac_marginalized" = practices_design_equity,
+   "prac_sel_curriculum" = practices_sel_curriculum,
+   "prac_sel_integrated" = practices_sel_integrated,
+   "prac_resources" = practices_reallocation_resources
+  )
+# rename 2022
+merge_2022 <- merge_2022 %>% 
+  rename(
+   "prac_culture" = practices_culturally_responsive,
+   "prac_sel_assess" = practices_assessments_sel,
+   "prac_community" =  practices_community_supports,
+   "prac_mental" = practices_mental_health,
+   "prac_restorative" = practices_restorative,
+   "prac_marginalized" = practices_design_marginalized,
+   "prac_sel_curriculum" = practices_sel_curriculum,
+   "prac_sel_integrated" = practices_sel_integrated,
+   "prac_resources" = practices_reallocation_resources
+  )
+```
+
+# MERGE!
+
+```{r merge}
+# merge 2019, 2021, & 2022
+main <- merge_2019 %>% 
+  full_join(merge_2021, by = c("nces_id", "school_id", "year", "wave", "school_name", "school_state", "locale", "frpl_percent", "bipoc_percent", "prac_culture", "prac_sel_assess", "prac_community", "prac_mental", "prac_restorative", "prac_marginalized", "prac_sel_curriculum", "prac_sel_integrated", "prac_resources")) %>% 
+  full_join(merge_2022, by = c("nces_id", "school_id", "year", "wave", "school_name", "school_state", "locale", "frpl_percent", "bipoc_percent", "prac_culture", "prac_sel_assess", "prac_community", "prac_mental", "prac_restorative", "prac_marginalized", "prac_sel_curriculum", "prac_sel_integrated", "prac_resources"))
+# rename merge datasets
+schools_2019 <- merge_2019
+schools_2021 <- merge_2021
+schools_2022 <- merge_2022
+#save new dataset
+# save(main, schools_2019, schools_2021, schools_2022,
+#      file = "canopy-schools.RData")
 ```
 
