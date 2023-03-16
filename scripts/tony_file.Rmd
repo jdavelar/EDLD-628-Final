@@ -1,0 +1,48 @@
+---
+title: "tony_file"
+author: "Tony Daza"
+date: "2023-03-16"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(needs)
+needs(tidyverse, rio, here, psych)
+```
+
+# Innovative School Practices   
+## Importing the Data  
+
+Thank you Janette for compiling the data!
+
+```{r import}
+
+load(here("data/canopy-schools.RData"))
+
+
+```
+
+*After looking at the data, I think we need to combine the tags into one variable as a count of number of practices if we are going to run the model as suggested*
+
+## Counting Number of Practices  
+
+```{r count}
+main$prac_tot <- rowSums(main[c(5,6,7,8,9,10,11,12,13)], na.rm=TRUE)
+
+
+```
+
+
+## Examining data to model   
+
+```{r desript}
+
+ggplot(data = main, aes(x = year, y = prac_tot )) +           
+  geom_bar(stat = "summary", fun = "mean", fill="cornflowerblue") + 
+  facet_grid(~locale) + 
+  theme_classic()   
+
+```
+
+
