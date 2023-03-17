@@ -57,5 +57,133 @@ ggplot(aes(x = wave, y = prac_tot )) +
   theme_classic()+
   labs(y = "Total Practices", x = "Wave")
 
+
 ```
+
+
+## Fixed Effects  
+
+This is how he did assignment 3 where we first examined if practices changed overtime in general without any predictors. 
+
+```{r}
+
+main$cwave <- c(scale(main$wave,  center=TRUE, scale=TRUE))
+main$cbipoc_percent <- c(scale(main$bipoc_percent,  center=TRUE, scale=TRUE)) 
+main$cfrpl_percent <- c(scale(main$frpl_percent,  center=TRUE, scale=TRUE))
+
+GLMMfix0 <- glmer(prac_tot ~ 1 + cwave + (1|school_id), 
+                  family = poisson, 
+                  data = main) 
+summary(GLMMfix0)
+
+```
+In this case, wave does seem to be significant. 
+
+## Model with predictors  
+
+Here we are adding in locale, percent bipoc, and percent frpl as predictors in our model. 
+
+```{r}
+library(lme4) 
+
+
+GLMMfix <- glmer(prac_tot ~ 1 + wave + locale + bipoc_percent + frpl_percent + (1|school_id), 
+                  family = poisson, 
+                  data = main) 
+## Not happy. Model failed to converge
+## Will try to rescale variables
+
+```
+
+## Model Rescaled predictors   
+
+The previous model failed to converge. I rescaled the predictors and now it converges. In this model we also have the interaction between wave and locale but not of percent bipoc and percent frpl.  
+
+```{r}
+
+
+GLMMfix1 <- glmer(prac_tot ~ 1 + cwave + 
+                    locale + 
+                    cbipoc_percent + 
+                    cfrpl_percent + 
+                    locale*cwave +
+                    (1|school_id), 
+                  family = poisson, 
+                  data = main) 
+summary(GLMMfix1)
+
+
+```
+
+In this model it seems like the interaction between wave and urban location was significant but not for suburban and wave. 
+
+### Model check   
+Is this any better than the unconditional model? 
+
+```{r, warning=FALSE, message=FALSE}
+
+AIC(GLMMfix0,GLMMfix1)
+BIC(GLMMfix0,GLMMfix1)
+
+## Cannot compare because different proportion of missing data.  
+# test_lrt(GLMMfix0,GLMMfix1) 
+
+```
+
+Based on AIC and BIC the model with predictors is a better fit.  
+
+## Predictors of growth  
+
+If I understand correctly, I think this adds percent bipoc and percent frpl as predictors of growth. 
+
+```{r}
+
+GLMMfix2 <- glmer(prac_tot ~ 1 + cwave + 
+                    locale + 
+                    cbipoc_percent + 
+                    cfrpl_percent + 
+                    locale*cwave +
+                    cbipoc_percent*cwave +
+                    cfrpl_percent*cwave +
+                    (1|school_id), 
+                  family = poisson, 
+                  data = main) 
+summary(GLMMfix2)
+
+## Model failed to converge. 
+
+```
+
+This model does not converge. 
+
+## Test for improvement of fit
+
+```{r}
+
+library(performance)
+test_lrt(GLMMfix1,GLMMfix2)
+
+```
+
+The second model does not seem to be better which would make sense given that it failed to converge.
+
+# Plots  
+
+```{r, warning=FALSE, message=FALSE}
+library(sjPlot)
+plot_model(GLMMfix1) + theme_classic () 
+
+plot_model(GLMMfix1,type = "eff")$cwave + theme_classic () # plot the effect of Time (Wave) 
+
+plot_model(GLMMfix1,type = "eff")$locale + theme_classic () # plot the effect of locale 
+ 
+library(interactions) 
+interact_plot(model=GLMMfix1, pred = cwave, modx = locale) # Enter the predictor of growth in the final model 
+```
+
+
+
+
+**No Idea if what I did above is correct**
+
 
