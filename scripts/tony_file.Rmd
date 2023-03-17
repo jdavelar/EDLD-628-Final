@@ -186,4 +186,27 @@ interact_plot(model=GLMMfix1, pred = cwave, modx = locale) # Enter the predictor
 
 **No Idea if what I did above is correct**
 
+## More Plot  
 
+```{r, warning=FALSE, message=FALSE}
+localegg <- summarySE(na.omit(main), measurevar="prac_tot", groupvars=c("locale","wave")) 
+
+localegg$wave<-as.numeric(localegg$wave)
+
+# The errorbars overlapped, so use position_dodge to move them horizontally
+pd <- position_dodge(0.1) # move them .05 to the left and right
+
+# Use 95% confidence interval instead of SEM
+
+ggplot(localegg, aes(x=wave, y=prac_tot, color=locale)) + 
+  geom_errorbar(aes(ymin=prac_tot-ci, ymax=prac_tot+ci), width=.1, position=pd) +
+  ylab("Total Practices") +
+  ylim(0,9) +
+  geom_line(position=pd) +
+  geom_point(position=pd) + theme_classic() + 
+  scale_color_manual(values=c("cornflowerblue", "chocolate1", "darkorchid2")) +
+  ggtitle("Locale x Group By Time with 95% Mean CIs") +
+  theme(plot.title = element_text(hjust = 0.5, lineheight=.8, face="bold"))
+  
+
+```
