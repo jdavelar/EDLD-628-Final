@@ -243,9 +243,6 @@ main <- merge_2019 %>%
 schools_2019 <- merge_2019
 schools_2021 <- merge_2021
 schools_2022 <- merge_2022
-#save new dataset
-# save(main, schools_2019, schools_2021, schools_2022,
-#      file = "canopy-schools.RData")
 ```
 
 # Missing Data
@@ -348,6 +345,9 @@ main <- main %>%
   school_id == 612 ~ "Urban",
   TRUE ~ as.character(locale)
 ))
+# save new dataset
+# save(main, schools_2019, schools_2021, schools_2022,
+#      file = "canopy-schools.RData")
 ```
 
 Marginal R^2 = fixed effects
