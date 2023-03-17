@@ -16,6 +16,8 @@ survey_2021a <- import(here("data", "schools_2020-21a.csv"))
 survey_2021b <- import(here("data", "schools_2020-21b.csv"))
 survey_2021c <- import(here("data", "schools_2020-21c.csv"))
 survey_2022 <- import(here("data", "schools_2021-22.csv"))
+#pull compiled data
+load(here("data", "canopy-schools.RData"))
 ```
 
 Variables of interest:
@@ -246,3 +248,107 @@ schools_2022 <- merge_2022
 #      file = "canopy-schools.RData")
 ```
 
+# Missing Data
+
+Note: 92 missing values for location 
+If we adopt listwise deletion, that's 474 unique observations (vs. 566).
+
+```{r missing locale}
+na_locale <- main %>% 
+  filter(locale == "" | is.na(locale)) %>% 
+  select(school_id, school_name, school_state, locale, year)
+#export(na_locale, "missing-locale.csv")
+```
+
+I've manually fixed as many NAs as I can using a combination of:  
+* NCES Lookup  
+* Google searches - specifically, using Maps to identify nearby schools and their locale when school does not have NCES ID  
+* Looked at previous decision-making for edge cases  
+
+Results => We now have 6 true NAs--these are schools that use virtual or cross-district models so they provide services to students across all geographic locales.
+
+```{r locale filling}
+main <- main %>% 
+  mutate(locale = case_when(
+  school_id == 3 ~ "Urban",
+  school_id == 8 ~ "Urban",
+  school_id == 11 ~ "Urban",
+  school_id == 35 ~ "Urban",
+  school_id == 39 ~ "Rural",
+  school_id == 45 ~ "Rural",
+  school_id == 49 ~ "Urban",
+  school_id == 52 ~ "Urban",
+  school_id == 58 ~ "Urban",
+  school_id == 62 ~ "Urban",
+  school_id == 63 ~ "Urban",
+  school_id == 67 ~ "Urban",
+  school_id == 72 ~ "Suburban",
+  school_id == 80 ~ "Urban",
+  school_id == 81 ~ "Suburban",
+  school_id == 88 ~ "Rural",
+  school_id == 100 ~ "Urban",
+  school_id == 101 ~ "Suburban",
+  school_id == 106 ~ "Urban",
+  school_id == 111 ~ "Urban",
+  school_id == 112 ~ "Urban",
+  school_id == 122 ~ "Suburban",
+  school_id == 135 ~ "Urban",
+  school_id == 136 ~ "Suburban",
+  school_id == 141 ~ "Rural",
+  school_id == 143 ~ "Urban",
+  school_id == 150 ~ "Urban",
+  school_id == 164 ~ "Suburban",
+  school_id == 165 ~ "Urban",
+  school_id == 172 ~ "Urban",
+  school_id == 185 ~ "Rural",
+  school_id == 189 ~ "Urban",
+  school_id == 190 ~ "Urban",
+  school_id == 194 ~ "Suburban",
+  school_id == 195 ~ "Urban",
+  school_id == 199 ~ "Urban",
+  school_id == 205 ~ "Urban",
+  school_id == 228 ~ "Urban",
+  school_id == 229 ~ "Rural",
+  school_id == 230 ~ "Suburban",
+  school_id == 247 ~ "Urban",
+  school_id == 251 ~ "Urban",
+  school_id == 253 ~ "Suburban",
+  school_id == 266 ~ "Urban",
+  school_id == 276 ~ "Urban",
+  school_id == 284 ~ "Urban",
+  school_id == 287 ~ "Urban",
+  school_id == 303 ~ "Urban",
+  school_id == 325 ~ "Urban",
+  school_id == 329 ~ "Urban",
+  school_id == 348 ~ "Urban",
+  school_id == 351 ~ "Urban",
+  school_id == 360 ~ "Suburban",
+  school_id == 368 ~ "Urban",
+  school_id == 382 ~ "Urban",
+  school_id == 389 ~ "Rural",
+  school_id == 391 ~ "Rural",
+  school_id == 394 ~ "Rural",
+  school_id == 395 ~ "Rural",
+  school_id == 396 ~ "Suburban",
+  school_id == 400 ~ "Urban",
+  school_id == 402 ~ "Urban",
+  school_id == 408 ~ "Suburban",
+  school_id == 443 ~ "Urban",
+  school_id == 462 ~ "Rural",
+  school_id == 466 ~ "Rural",
+  school_id == 472 ~ "Urban",
+  school_id == 478 ~ "Urban",
+  school_id == 528 ~ "Urban",
+  school_id == 532 ~ "Rural",
+  school_id == 535 ~ "Rural",
+  school_id == 571 ~ "Urban",
+  school_id == 573 ~ "Suburban",
+  school_id == 586 ~ "Urban",
+  school_id == 610 ~ "Suburban",
+  school_id == 612 ~ "Urban",
+  TRUE ~ as.character(locale)
+))
+```
+
+Marginal R^2 = fixed effects
+Conditional R^2 = random effects
