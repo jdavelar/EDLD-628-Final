@@ -2,12 +2,21 @@
 title: "tony_file"
 author: "Tony Daza"
 date: "2023-03-16"
-output: html_document
+output: 
+  html_document:
+    toc: true
+    toc_depth: 3
+    toc_float: true 
+    code_folding: hide
+    theme: cerulean
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 library(needs)
+library(lme4)  
+library(Rmisc)
+library(sjPlot)
 needs(tidyverse, rio, here, psych)
 ```
 
@@ -60,18 +69,19 @@ ggplot(aes(x = wave, y = prac_tot )) +
 
 ```
 
+**Add descriptive data**
+
 
 ## Fixed Effects  
 
 This is how he did assignment 3 where we first examined if practices changed overtime in general without any predictors. 
 
 ```{r}
-
-main$cwave <- c(scale(main$wave,  center=TRUE, scale=TRUE))
+main$cwave <- c(scale(main$wave, center = TRUE, scale =TRUE))
 main$cbipoc_percent <- c(scale(main$bipoc_percent,  center=TRUE, scale=TRUE)) 
 main$cfrpl_percent <- c(scale(main$frpl_percent,  center=TRUE, scale=TRUE))
 
-GLMMfix0 <- glmer(prac_tot ~ 1 + cwave + (1|school_id), 
+GLMMfix0 <- glmer(prac_tot ~ 1 + wave + (1|school_id), 
                   family = poisson, 
                   data = main) 
 summary(GLMMfix0)
@@ -99,6 +109,9 @@ GLMMfix <- glmer(prac_tot ~ 1 + wave + locale + bipoc_percent + frpl_percent + (
 
 The previous model failed to converge. I rescaled the predictors and now it converges. In this model we also have the interaction between wave and locale but not of percent bipoc and percent frpl.  
 
+
+**The model did not converge without centering the data. Why is that?**
+
 ```{r}
 
 
@@ -111,9 +124,12 @@ GLMMfix1 <- glmer(prac_tot ~ 1 + cwave +
                   family = poisson, 
                   data = main) 
 summary(GLMMfix1)
+tab_model(GLMMfix1)
 
 
 ```
+
+**Add ICC**
 
 In this model it seems like the interaction between wave and urban location was significant but not for suburban and wave. 
 
@@ -210,3 +226,73 @@ ggplot(localegg, aes(x=wave, y=prac_tot, color=locale)) +
   
 
 ```
+
+
+# Growth model Random Effect  
+
+Unsure if we want to include random effects for the growth model. I think it would be for wave but not sure.  
+
+```{r}
+
+
+# GLMMran1 <- glmer(prac_tot ~ 1 + wave + 
+#                      locale + 
+#                      bipoc_percent + 
+#                      frpl_percent + 
+#                      locale*wave +
+#                      (1+wave|school_id), 
+#                    family = poisson, 
+#                    data = main) 
+# summary(GLMMran1)
+
+
+
+```
+I am getting an error that the number of random effects is greater than the number of observations.  
+
+
+**Attempt #2**
+
+```{r}
+library(lmerTest)
+library(mice)
+library(broom.mixed)
+library(mitml)
+
+md.pattern(main, rotate.names = T)
+
+
+```
+
+Tells us where the missing data is though I don't completely know how to read it. 
+
+Okay this is from stackoverflow and is suggested as a way to manage missing data. It allows me to run the model, but I am not sure it is needed.
+
+```{r}
+#Someone online suggested this package to impute data
+
+#### Impute ####
+imp <- mice(main,
+            m=5)
+
+#### Fit With Imputations ####
+fit <- with(imp,
+            lmer(prac_tot ~ locale + cwave + 
+                   cbipoc_percent+
+                   cfrpl_percent+
+                   locale*cwave+
+                   cbipoc_percent*cwave+
+                   cfrpl_percent*cwave+
+                   (1|school_id)))
+
+#### Pool and Summarise ####
+pool <- pool(fit)
+summary(pool)
+
+
+#### Load Library and Get All Estimates ####
+testEstimates(as.mitml.result(fit),
+              extra.pars = T)
+```
+
+
