@@ -13,12 +13,19 @@ output:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-library(needs)
+library(tidyverse)
+library(psych)
+library(rio)
 library(lme4)  
 library(Rmisc)
 library(sjPlot)
 library(rempsyc)
-needs(tidyverse, rio, here, psych)
+library(DT)
+library(here)
+library(naniar)
+library(performance)
+library(sjPlot)
+library(interactions) 
 ```
 
 # Innovative School Practices   
@@ -71,11 +78,22 @@ ggplot(aes(x = wave, y = prac_tot )) +
 
 
 ```{r}
-describe(main[5:22], fast = TRUE, ranges = FALSE)
 
-nice_table(main[5:22])
+datatable(round(describe(main[5:19], fast = TRUE, ranges = FALSE), digits = 2))
+
 ```
 
+
+## Missing Data  
+
+Here we are running an MCAR test to examing to see if the missing data for locale, free and reduced price lunch, and percent bipoc is missing at random. If it is at random then we will continue as planned. If not, we will use imputed data.
+
+```{r missing}
+
+mcar_test(main)
+```
+
+There is an error which I don't know how to read.
 
 ## Fixed Effects  
 
@@ -99,8 +117,6 @@ In this case, wave does seem to be significant.
 Here we are adding in locale, percent bipoc, and percent frpl as predictors in our model. 
 
 ```{r}
-library(lme4) 
-
 
 GLMMfix <- glmer(prac_tot ~ 1 + wave + locale + bipoc_percent + frpl_percent + (1|school_id), 
                   family = poisson, 
@@ -134,7 +150,11 @@ tab_model(GLMMfix1)
 
 ```
 
-**Add ICC**
+**ICC: 0.21**
+
+**Marginal R^2: 0.216 (21.6% of variance explained)**
+
+**Conditional R^2: 0.378 (37.8% of variance explained)**
 
 In this model it seems like the interaction between wave and urban location was significant but not for suburban and wave. 
 
@@ -181,24 +201,21 @@ This model does not converge.
 
 ```{r}
 
-library(performance)
 test_lrt(GLMMfix1,GLMMfix2)
 
 ```
 
-The second model does not seem to be better which would make sense given that it failed to converge.
+The second model does not seem to be better which would make sense given that we likely wouldn't expect percent frpl and percent bipoc to change significantly in a short timeframe and adding the interactions of those two with wave increased our degrees of freedom.
 
 # Plots  
 
 ```{r, warning=FALSE, message=FALSE}
-library(sjPlot)
 plot_model(GLMMfix1) + theme_classic () 
 
 plot_model(GLMMfix1,type = "eff")$cwave + theme_classic () # plot the effect of Time (Wave) 
 
 plot_model(GLMMfix1,type = "eff")$locale + theme_classic () # plot the effect of locale 
  
-library(interactions) 
 interact_plot(model=GLMMfix1, pred = cwave, modx = locale) # Enter the predictor of growth in the final model 
 ```
 
@@ -207,7 +224,7 @@ interact_plot(model=GLMMfix1, pred = cwave, modx = locale) # Enter the predictor
 
 **No Idea if what I did above is correct**
 
-## More Plot  
+## Another Plot  
 
 ```{r, warning=FALSE, message=FALSE}
 localegg <- summarySE(na.omit(main), measurevar="prac_tot", groupvars=c("locale","wave")) 
@@ -256,7 +273,9 @@ Unsure if we want to include random effects for the growth model. I think it wou
 I am getting an error that the number of random effects is greater than the number of observations.  
 
 
-**Attempt #2**
+# Imputed Data
+
+If needed, here is the model with imputed data, if the MCAR test determines that the missing data is not at random. 
 
 ```{r}
 library(lmerTest)
@@ -282,7 +301,7 @@ imp <- mice(main,
 
 #### Fit With Imputations ####
 fit <- with(imp,
-            lmer(prac_tot ~ locale + cwave + 
+            glmer(prac_tot ~ locale + cwave + 
                    cbipoc_percent+
                    cfrpl_percent+
                    locale*cwave+
