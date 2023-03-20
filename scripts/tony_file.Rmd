@@ -88,7 +88,7 @@ datatable(round(describe(main[5:19], fast = TRUE, ranges = FALSE), digits = 2))
 
 Here we are running an MCAR test to examing to see if the missing data for locale, free and reduced price lunch, and percent bipoc is missing at random. If it is at random then we will continue as planned. If not, we will use imputed data.
 
-```{r missing}
+```{r missing, warning=FALSE, message=FALSE, eval=FALSE}
 
 mcar_test(main)
 ```
