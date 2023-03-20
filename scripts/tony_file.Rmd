@@ -17,6 +17,7 @@ library(needs)
 library(lme4)  
 library(Rmisc)
 library(sjPlot)
+library(rempsyc)
 needs(tidyverse, rio, here, psych)
 ```
 
@@ -44,12 +45,11 @@ main <- main %>% mutate_at(c('locale'), ~na_if(.,''))
 main$locale <- as.factor(main$locale)
 
 
-count(main)
+summary(main)
 
-main %>%
-  count(locale)
-
-# Looks like we have 92 NA value schools.
+# Looks like we have 6 NA value schools now for Locale. 
+## 91 NA values for bipoc.  
+## 1117 NA values for frpl.  
 
 ```
 
@@ -69,7 +69,12 @@ ggplot(aes(x = wave, y = prac_tot )) +
 
 ```
 
-**Add descriptive data**
+
+```{r}
+describe(main[5:22], fast = TRUE, ranges = FALSE)
+
+nice_table(main[5:22])
+```
 
 
 ## Fixed Effects  
@@ -110,7 +115,7 @@ GLMMfix <- glmer(prac_tot ~ 1 + wave + locale + bipoc_percent + frpl_percent + (
 The previous model failed to converge. I rescaled the predictors and now it converges. In this model we also have the interaction between wave and locale but not of percent bipoc and percent frpl.  
 
 
-**The model did not converge without centering the data. Why is that?**
+**The model did not converge without scaling the data. Why is that?**
 
 ```{r}
 
