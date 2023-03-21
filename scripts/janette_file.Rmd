@@ -56,7 +56,7 @@ merge_2019 <- survey_2019 %>%
   select(!c(asian_percent, hispanic_percent, black_percent, white_percent, multiple_races_percent, hawaiian_native_percent, native_percent)) %>% 
   # add year and wave columns
   mutate(year = rep(2019, 173),
-         wave = rep(1, 173)) %>% 
+         wave = rep(0, 173)) %>% 
   # fill in not tagged **************NOT WORKING************
   mutate_at(vars(starts_with("practices_")), replace_na, 0)
 #will need to double check that practices names match over time
@@ -352,3 +352,14 @@ main <- main %>%
 
 Marginal R^2 = fixed effects
 Conditional R^2 = random effects
+
+How many states?
+
+```{r states}
+states <- main %>% 
+  select(school_state) %>% 
+  unique()
+#export(states, "states.csv")
+```
+
+
