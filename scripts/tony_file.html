@@ -4300,8 +4300,8 @@ ggplot(aes(x = wave, y = prac_tot )) +
 <div id="descriptive-table" class="section level3">
 <h3>Descriptive Table</h3>
 <pre class="r"><code>datatable(round(describe(main[5:19], fast = TRUE, ranges = FALSE), digits = 2))</code></pre>
-<div class="datatables html-widget html-fill-item-overflow-hidden html-fill-item" id="htmlwidget-68e3fe69df8852f65e5c" style="width:100%;height:auto;"></div>
-<script type="application/json" data-for="htmlwidget-68e3fe69df8852f65e5c">{"x":{"filter":"none","vertical":false,"data":[["prac_culture","prac_sel_assess","prac_community","prac_mental","prac_restorative","prac_marginalized","prac_sel_curriculum","prac_sel_integrated","prac_resources","locale","frpl_percent","bipoc_percent","year","wave","prac_tot"],[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15],[566,566,566,566,566,566,566,566,566,560,449,475,566,566,566],[0.61,0.63,0.59,0.66,0.64,0.6,0.35,0.65,0.45,null,50.82,54.5,2020.67,1.67,5.2],[0.49,0.48,0.49,0.47,0.48,0.49,0.48,0.48,0.5,null,29.94,33.56,1.18,1.18,2.56],[0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,null,1.41,1.54,0.05,0.05,0.11]],"container":"<table class=\"display\">\n  <thead>\n    <tr>\n      <th> <\/th>\n      <th>vars<\/th>\n      <th>n<\/th>\n      <th>mean<\/th>\n      <th>sd<\/th>\n      <th>se<\/th>\n    <\/tr>\n  <\/thead>\n<\/table>","options":{"columnDefs":[{"className":"dt-right","targets":[1,2,3,4,5]},{"orderable":false,"targets":0}],"order":[],"autoWidth":false,"orderClasses":false}},"evals":[],"jsHooks":[]}</script>
+<div class="datatables html-widget html-fill-item-overflow-hidden html-fill-item" id="htmlwidget-b547db63c4c88a117a29" style="width:100%;height:auto;"></div>
+<script type="application/json" data-for="htmlwidget-b547db63c4c88a117a29">{"x":{"filter":"none","vertical":false,"data":[["prac_culture","prac_sel_assess","prac_community","prac_mental","prac_restorative","prac_marginalized","prac_sel_curriculum","prac_sel_integrated","prac_resources","locale","frpl_percent","bipoc_percent","year","wave","prac_tot"],[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15],[566,566,566,566,566,566,566,566,566,560,449,475,566,566,566],[0.61,0.63,0.59,0.66,0.64,0.6,0.35,0.65,0.45,null,50.82,54.5,2020.67,1.67,5.2],[0.49,0.48,0.49,0.47,0.48,0.49,0.48,0.48,0.5,null,29.94,33.56,1.18,1.18,2.56],[0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,null,1.41,1.54,0.05,0.05,0.11]],"container":"<table class=\"display\">\n  <thead>\n    <tr>\n      <th> <\/th>\n      <th>vars<\/th>\n      <th>n<\/th>\n      <th>mean<\/th>\n      <th>sd<\/th>\n      <th>se<\/th>\n    <\/tr>\n  <\/thead>\n<\/table>","options":{"columnDefs":[{"className":"dt-right","targets":[1,2,3,4,5]},{"orderable":false,"targets":0}],"order":[],"autoWidth":false,"orderClasses":false}},"evals":[],"jsHooks":[]}</script>
 </div>
 <div id="distribution" class="section level3">
 <h3>Distribution:</h3>
@@ -4340,6 +4340,97 @@ waves Examine means test of the two groups and report that.</p>
 <p><strong>Only impute data if missing completely at random</strong></p>
 <p>In this case though, because we know the reason for why it is missing
 might make sense.</p>
+<div id="examining-mean-differences" class="section level3">
+<h3>Examining mean differences</h3>
+<pre class="r"><code>## Setting up the groups(Complete and incomplete data to examine mean differences)
+main_complete &lt;- main %&gt;%
+  filter(bipoc_percent != &quot;NA&quot; &amp; frpl_percent != &quot;NA&quot; &amp; locale != &quot;NA&quot;)%&gt;%
+  mutate(group = 1) # schools with complete data are coded 1
+
+main_miss &lt;- main %&gt;%
+  filter(is.na(bipoc_percent) | is.na(frpl_percent) | is.na(locale))%&gt;%
+  mutate(group=0) # schools with missing data are coded 0
+
+main_test &lt;- full_join(main_complete, main_miss) # rejoining the data</code></pre>
+<pre><code>## Joining with `by = join_by(nces_id, school_id, school_name, school_state,
+## prac_culture, prac_sel_assess, prac_community, prac_mental, prac_restorative,
+## prac_marginalized, prac_sel_curriculum, prac_sel_integrated, prac_resources,
+## locale, frpl_percent, bipoc_percent, year, wave, prac_tot, cbipoc_percent,
+## cfrpl_percent, group)`</code></pre>
+<pre class="r"><code>main_test$group &lt;- as.factor(main_test$group) 
+
+## Testing the mean difference in total practices for complete and incomplete school data
+t.test(prac_tot ~ group, data = main_test)</code></pre>
+<pre><code>## 
+##  Welch Two Sample t-test
+## 
+## data:  prac_tot by group
+## t = 0.89152, df = 208.32, p-value = 0.3737
+## alternative hypothesis: true difference in means between group 0 and group 1 is not equal to 0
+## 95 percent confidence interval:
+##  -0.2712194  0.7190372
+## sample estimates:
+## mean in group 0 mean in group 1 
+##        5.370968        5.147059</code></pre>
+<pre class="r"><code># This suggests that the difference in practice total is not significant between school groups.
+
+# To double check because our data is not exactly normal, here is the wilcox test
+wilcox.test(prac_tot ~ group, data = main_test)</code></pre>
+<pre><code>## 
+##  Wilcoxon rank sum test with continuity correction
+## 
+## data:  prac_tot by group
+## W = 28466, p-value = 0.507
+## alternative hypothesis: true location shift is not equal to 0</code></pre>
+<pre class="r"><code># Is in agreement with Welch&#39;s test that the difference in practice totals is not significant
+
+## Examining the locale data for missing and complete school data
+locale_count_complete &lt;- main_test %&gt;% filter(group == 1) %&gt;% dplyr::count(locale)
+locale_count_complete$prct_locale &lt;- round((locale_count_complete$n/442)*100,digits = 2)
+datatable(locale_count_complete) # Percent of each locale for complete schools data </code></pre>
+<div class="datatables html-widget html-fill-item-overflow-hidden html-fill-item" id="htmlwidget-da1052f8031af2583b83" style="width:100%;height:auto;"></div>
+<script type="application/json" data-for="htmlwidget-da1052f8031af2583b83">{"x":{"filter":"none","vertical":false,"data":[["1","2","3"],["Rural","Suburban","Urban"],[112,84,246],[25.34,19,55.66]],"container":"<table class=\"display\">\n  <thead>\n    <tr>\n      <th> <\/th>\n      <th>locale<\/th>\n      <th>n<\/th>\n      <th>prct_locale<\/th>\n    <\/tr>\n  <\/thead>\n<\/table>","options":{"columnDefs":[{"className":"dt-right","targets":[2,3]},{"orderable":false,"targets":0}],"order":[],"autoWidth":false,"orderClasses":false}},"evals":[],"jsHooks":[]}</script>
+<pre class="r"><code>locale_count_miss &lt;- main_test %&gt;% filter(group == 0) %&gt;% dplyr::count(locale)
+locale_count_miss$prct_locale &lt;- round((locale_count_miss$n/124)*100, digits = 2)
+datatable(locale_count_miss) # percent of each locale for incomplete schools data</code></pre>
+<div class="datatables html-widget html-fill-item-overflow-hidden html-fill-item" id="htmlwidget-adf4092c934985a6f570" style="width:100%;height:auto;"></div>
+<script type="application/json" data-for="htmlwidget-adf4092c934985a6f570">{"x":{"filter":"none","vertical":false,"data":[["1","2","3","4"],["Rural","Suburban","Urban",null],[17,21,80,6],[13.71,16.94,64.52,4.84]],"container":"<table class=\"display\">\n  <thead>\n    <tr>\n      <th> <\/th>\n      <th>locale<\/th>\n      <th>n<\/th>\n      <th>prct_locale<\/th>\n    <\/tr>\n  <\/thead>\n<\/table>","options":{"columnDefs":[{"className":"dt-right","targets":[2,3]},{"orderable":false,"targets":0}],"order":[],"autoWidth":false,"orderClasses":false}},"evals":[],"jsHooks":[]}</script>
+<pre class="r"><code>main_test$locale &lt;- as.numeric(main_test$locale) # need to change locale to a factor to examine the difference here.
+
+t.test(locale ~ group, data = main_test)</code></pre>
+<pre><code>## 
+##  Welch Two Sample t-test
+## 
+## data:  locale by group
+## t = 2.9261, df = 207.8, p-value = 0.003814
+## alternative hypothesis: true difference in means between group 0 and group 1 is not equal to 0
+## 95 percent confidence interval:
+##  0.07527584 0.38618593
+## sample estimates:
+## mean in group 0 mean in group 1 
+##        2.533898        2.303167</code></pre>
+<pre class="r"><code># Suggests that the difference in location is significant by locale between the complete and incomplete data
+
+wilcox.test(locale ~ group, data = main_test)</code></pre>
+<pre><code>## 
+##  Wilcoxon rank sum test with continuity correction
+## 
+## data:  locale by group
+## W = 29706, p-value = 0.008695
+## alternative hypothesis: true location shift is not equal to 0</code></pre>
+<pre class="r"><code># It does seem like the groups differ by percent of locale missing. </code></pre>
+<p>Based on an examination of the mean differences between groups of
+complete data schools and missing data schools, it seems like there is
+no difference in the mean total practices of schools with missing frpl
+and bipoc data compared to schools with complete data.</p>
+<p>When examining the location data, there is a difference between
+complete data schools and missing data schools with regard to location
+data. Complete data schools had a higher percentage of rural schools
+(25% to 14% in the missing data group) as well as a higher percentage of
+suburban schools (19% to 17%). Alternatively, the missing data group had
+a higher percentage of urban schools (65% compared to 56% of Urban
+schools in the complete data group).</p>
+</div>
 </div>
 <div id="fixed-effects" class="section level2">
 <h2>Fixed Effects</h2>
@@ -5573,13 +5664,13 @@ fit &lt;- with(imp,
 #### Pool and Summarise ####
 pool &lt;- pool(fit)
 summary(pool)</code></pre>
-<pre><code>##             term  estimate std.error  statistic       df      p.value
-## 1    (Intercept) 2.8633508 0.2934819  9.7564812 433.8216 1.834415e-20
-## 2           wave 0.7951443 0.0768220 10.3504768 433.9698 1.378004e-22
-## 3 localeSuburban 0.9577348 0.3865039  2.4779434 433.5752 1.359404e-02
-## 4    localeUrban 1.1886106 0.3555780  3.3427568 433.3614 9.014869e-04
-## 5 cbipoc_percent 0.1353690 0.1778325  0.7612162 433.4582 4.469418e-01
-## 6  cfrpl_percent 0.2598648 0.1494165  1.7391967 433.8627 8.270943e-02</code></pre>
+<pre><code>##             term  estimate  std.error  statistic       df      p.value
+## 1    (Intercept) 2.8570174 0.29330367  9.7408170 433.4983 2.088209e-20
+## 2           wave 0.7957065 0.07678301 10.3630544 433.9186 1.240893e-22
+## 3 localeSuburban 0.9624629 0.38635273  2.4911507 432.5723 1.310687e-02
+## 4    localeUrban 1.2003244 0.35579144  3.3736743 432.6502 8.085089e-04
+## 5 cbipoc_percent 0.1299111 0.17825748  0.7287835 432.8748 4.665282e-01
+## 6  cfrpl_percent 0.2627799 0.14954971  1.7571407 433.5889 7.959957e-02</code></pre>
 <pre class="r"><code>#### Load Library and Get All Estimates ####
 testEstimates(as.mitml.result(fit),
               extra.pars = T)</code></pre>
@@ -5591,17 +5682,17 @@ testEstimates(as.mitml.result(fit),
 ## Final parameter estimates and inferences obtained from 5 imputed data sets.
 ## 
 ##                 Estimate Std.Error   t.value        df   P(&gt;|t|)       RIV       FMI 
-## (Intercept)        2.863     0.293     9.756 2.234e+07     0.000     0.000     0.000 
-## wave               0.795     0.077    10.350 1.351e+09     0.000     0.000     0.000 
-## localeSuburban     0.958     0.387     2.478 4.737e+06     0.013     0.001     0.001 
-## localeUrban        1.189     0.356     3.343 2.311e+06     0.001     0.001     0.001 
-## cbipoc_percent     0.135     0.178     0.761 3.082e+06     0.447     0.001     0.001 
-## cfrpl_percent      0.260     0.149     1.739 3.552e+07     0.082     0.000     0.000 
+## (Intercept)        2.857     0.293     9.741 3.528e+06     0.000     0.001     0.001 
+## wave               0.796     0.077    10.363 8.731e+07     0.000     0.000     0.000 
+## localeSuburban     0.962     0.386     2.491 5.941e+05     0.013     0.003     0.003 
+## localeUrban        1.200     0.356     3.374 6.510e+05     0.001     0.002     0.002 
+## cbipoc_percent     0.130     0.178     0.729 8.794e+05     0.466     0.002     0.002 
+## cfrpl_percent      0.263     0.150     1.757 5.023e+06     0.079     0.001     0.001 
 ## 
 ##                                Estimate 
-## Intercept~~Intercept|school_id    3.097 
-## Residual~~Residual                2.448 
-## ICC|school_id                     0.559 
+## Intercept~~Intercept|school_id    3.094 
+## Residual~~Residual                2.447 
+## ICC|school_id                     0.558 
 ## 
 ## Unadjusted hypothesis test as appropriate in larger samples.</code></pre>
 <p>Compare imputed model and out model (missing data)</p>
