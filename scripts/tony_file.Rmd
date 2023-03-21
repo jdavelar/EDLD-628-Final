@@ -76,6 +76,7 @@ ggplot(aes(x = wave, y = prac_tot )) +
 
 ```
 
+### Descriptive Table  
 
 ```{r}
 
@@ -83,33 +84,68 @@ datatable(round(describe(main[5:19], fast = TRUE, ranges = FALSE), digits = 2))
 
 ```
 
+### Distribution: 
+
+```{r}
+main %>%
+  ggplot(aes(x = prac_tot)) +
+  geom_bar(fill= "darkorchid2") +
+  theme_minimal()
+
+```
 
 ## Missing Data  
 
 Here we are running an MCAR test to examing to see if the missing data for locale, free and reduced price lunch, and percent bipoc is missing at random. If it is at random then we will continue as planned. If not, we will use imputed data.
 
-```{r missing, warning=FALSE, message=FALSE, eval=FALSE}
+```{r missing, warning=FALSE}
 
-mcar_test(main)
+ 
+main$cbipoc_percent <- c(scale(main$bipoc_percent,  center=TRUE, scale=TRUE)) 
+main$cfrpl_percent <- c(scale(main$frpl_percent,  center=TRUE, scale=TRUE))
+
+main_mcar <- main %>%
+  select(wave, frpl_percent, locale, bipoc_percent, prac_tot)
+
+main_mcar$locale <- as.numeric(main_mcar$locale)
+
+mcar_test(main_mcar)
+
+
+
+
 ```
 
-There is an error which I don't know how to read.
+There is a difference between complete cases and partial cases. Code complete and partial data and run t tests to try to predict difference between cases. If there is a mean difference, we should add that as a control in the model. 
+
+Attrition analysis: examine schools that participated over all 3 waves
+Examine means test of the two groups and report that.
+
+**Only impute data if missing completely at random**
+
+In this case though, because we know the reason for why it is missing might make sense. 
+
 
 ## Fixed Effects  
 
 This is how he did assignment 3 where we first examined if practices changed overtime in general without any predictors. 
 
 ```{r}
-main$cwave <- c(scale(main$wave, center = TRUE, scale =TRUE))
-main$cbipoc_percent <- c(scale(main$bipoc_percent,  center=TRUE, scale=TRUE)) 
-main$cfrpl_percent <- c(scale(main$frpl_percent,  center=TRUE, scale=TRUE))
 
-GLMMfix0 <- glmer(prac_tot ~ 1 + wave + (1|school_id), 
+
+
+GLMMCond <- glmer(prac_tot ~ 1 + wave + (1|school_id), 
                   family = poisson, 
                   data = main) 
-summary(GLMMfix0)
+summary(GLMMCond)
+tab_model(GLMMCond)
 
 ```
+
+**ICC: 0.29**
+
+Total observations 566 (Before we have missing data in the predictors)
+
 In this case, wave does seem to be significant. 
 
 ## Model with predictors  
@@ -118,29 +154,44 @@ Here we are adding in locale, percent bipoc, and percent frpl as predictors in o
 
 ```{r}
 
-GLMMfix <- glmer(prac_tot ~ 1 + wave + locale + bipoc_percent + frpl_percent + (1|school_id), 
+GLMMfix <- glmer(prac_tot ~ 1 + wave + locale + cbipoc_percent + cfrpl_percent + (1|school_id), 
                   family = poisson, 
                   data = main) 
-## Not happy. Model failed to converge
-## Will try to rescale variables
+
+## No interaction term here
+summary(GLMMfix)
+tab_model(GLMMfix)
+```
+
+### Model check Conditional 
+Is this any better than the unconditional model? 
+
+```{r, warning=FALSE, message=FALSE}
+
+AIC(GLMMCond,GLMMfix)
+BIC(GLMMCond,GLMMfix)
+
+# Cannot test comparison because different proportion of missing data between the models.
+# test_lrt(GLMMCond,GLMMfix) 
 
 ```
 
-## Model Rescaled predictors   
+The model with predictors is better than the conditional model according to the AIC and BIC. 
 
-The previous model failed to converge. I rescaled the predictors and now it converges. In this model we also have the interaction between wave and locale but not of percent bipoc and percent frpl.  
+## Model Interactions   
+**Locale x Wave**    
 
+The previous model did not have an interaction effect. In this model we have the interaction between wave and locale but not of percent bipoc and percent frpl.  
 
-**The model did not converge without scaling the data. Why is that?**
 
 ```{r}
 
 
-GLMMfix1 <- glmer(prac_tot ~ 1 + cwave + 
+GLMMfix1 <- glmer(prac_tot ~ 1 + wave + 
                     locale + 
                     cbipoc_percent + 
                     cfrpl_percent + 
-                    locale*cwave +
+                    locale*wave +
                     (1|school_id), 
                   family = poisson, 
                   data = main) 
@@ -150,56 +201,59 @@ tab_model(GLMMfix1)
 
 ```
 
-**ICC: 0.21**
+**ICC: 0.20**
 
-**Marginal R^2: 0.216 (21.6% of variance explained)**
+**Marginal R^2: 0.235 (23.5% of variance explained)**
 
-**Conditional R^2: 0.378 (37.8% of variance explained)**
+**Conditional R^2: 0.388 (38.8% of variance explained)**
 
 In this model it seems like the interaction between wave and urban location was significant but not for suburban and wave. 
 
-### Model check   
-Is this any better than the unconditional model? 
+### Model check Interaction   
+Is this any better than the model without the interaction term? 
 
 ```{r, warning=FALSE, message=FALSE}
 
-AIC(GLMMfix0,GLMMfix1)
-BIC(GLMMfix0,GLMMfix1)
+AIC(GLMMfix,GLMMfix1)
+BIC(GLMMfix,GLMMfix1)
 
-## Cannot compare because different proportion of missing data.  
-# test_lrt(GLMMfix0,GLMMfix1) 
+  
+test_lrt(GLMMfix,GLMMfix1) 
 
 ```
 
-Based on AIC and BIC the model with predictors is a better fit.  
+Based on AIC and BIC the model without the interaction term is a better model. 
 
 ## Predictors of growth  
 
-If I understand correctly, I think this adds percent bipoc and percent frpl as predictors of growth. 
+Here we add a model with interaction effects between not only locale but percent bipoc and percent frpl as well.  
 
 ```{r}
 
-GLMMfix2 <- glmer(prac_tot ~ 1 + cwave + 
+GLMMfix2 <- glmer(prac_tot ~ 1 + wave + 
                     locale + 
                     cbipoc_percent + 
                     cfrpl_percent + 
-                    locale*cwave +
-                    cbipoc_percent*cwave +
-                    cfrpl_percent*cwave +
+                    locale*wave +
+                    cbipoc_percent*wave +
+                    cfrpl_percent*wave +
                     (1|school_id), 
                   family = poisson, 
                   data = main) 
 summary(GLMMfix2)
 
-## Model failed to converge. 
+## Model failed to converge with optimizer. Can check afix package for optimizers later.
 
 ```
 
-This model does not converge. 
 
-## Test for improvement of fit
+### Model check Interactions   
+**Interaction: Wave X Locale , Wave X Percent FRPL , Wave X Percent BIPOC**
 
 ```{r}
+
+AIC(GLMMfix1,GLMMfix2)
+BIC(GLMMfix1,GLMMfix2)
 
 test_lrt(GLMMfix1,GLMMfix2)
 
@@ -210,19 +264,16 @@ The second model does not seem to be better which would make sense given that we
 # Plots  
 
 ```{r, warning=FALSE, message=FALSE}
-plot_model(GLMMfix1) + theme_classic () 
+plot_model(GLMMfix) + theme_classic () 
 
-plot_model(GLMMfix1,type = "eff")$cwave + theme_classic () # plot the effect of Time (Wave) 
+plot_model(GLMMfix,type = "eff")$wave + theme_classic () # plot the effect of Time (Wave) 
 
-plot_model(GLMMfix1,type = "eff")$locale + theme_classic () # plot the effect of locale 
+plot_model(GLMMfix,type = "eff")$locale + theme_classic () # plot the effect of locale 
  
-interact_plot(model=GLMMfix1, pred = cwave, modx = locale) # Enter the predictor of growth in the final model 
+interact_plot(model=GLMMfix, pred = wave, modx = locale) # Enter the predictor of growth in the final model 
 ```
 
 
-
-
-**No Idea if what I did above is correct**
 
 ## Another Plot  
 
@@ -250,28 +301,15 @@ ggplot(localegg, aes(x=wave, y=prac_tot, color=locale)) +
 ```
 
 
-# Growth model Random Effect  
+## Tab Model  
+**Using the Predictor model with no interaction term**
+Rated as the best model based on test of fit and AIC and BIC.  
 
-Unsure if we want to include random effects for the growth model. I think it would be for wave but not sure.  
+```{r tab model}
 
-```{r}
-
-
-# GLMMran1 <- glmer(prac_tot ~ 1 + wave + 
-#                      locale + 
-#                      bipoc_percent + 
-#                      frpl_percent + 
-#                      locale*wave +
-#                      (1+wave|school_id), 
-#                    family = poisson, 
-#                    data = main) 
-# summary(GLMMran1)
-
-
+tab_model(GLMMfix)
 
 ```
-I am getting an error that the number of random effects is greater than the number of observations.  
-
 
 # Imputed Data
 
@@ -301,22 +339,21 @@ imp <- mice(main,
 
 #### Fit With Imputations ####
 fit <- with(imp,
-            glmer(prac_tot ~ locale + cwave + 
+            glmer(prac_tot ~ wave + locale +
                    cbipoc_percent+
                    cfrpl_percent+
-                   locale*cwave+
-                   cbipoc_percent*cwave+
-                   cfrpl_percent*cwave+
                    (1|school_id)))
 
 #### Pool and Summarise ####
 pool <- pool(fit)
 summary(pool)
 
-
 #### Load Library and Get All Estimates ####
 testEstimates(as.mitml.result(fit),
               extra.pars = T)
 ```
+
+Compare imputed model and out model (missing data)
+
 
 
