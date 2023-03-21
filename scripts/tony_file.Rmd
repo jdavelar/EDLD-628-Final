@@ -56,13 +56,13 @@ summary(main)
 
 # Looks like we have 6 NA value schools now for Locale. 
 ## 91 NA values for bipoc.  
-## 1117 NA values for frpl.  
+## 117 NA values for frpl.  
 
 ```
 
 ## Examining data to model   
 
-```{r desript}
+```{r desript plot}
 
 main %>%
   filter(locale != "NA") %>%
@@ -78,7 +78,7 @@ ggplot(aes(x = wave, y = prac_tot )) +
 
 ### Descriptive Table  
 
-```{r}
+```{r descriptive table}
 
 datatable(round(describe(main[5:19], fast = TRUE, ranges = FALSE), digits = 2))
 
@@ -86,7 +86,7 @@ datatable(round(describe(main[5:19], fast = TRUE, ranges = FALSE), digits = 2))
 
 ### Distribution: 
 
-```{r}
+```{r practice distribution}
 main %>%
   ggplot(aes(x = prac_tot)) +
   geom_bar(fill= "darkorchid2") +
@@ -130,7 +130,7 @@ In this case though, because we know the reason for why it is missing might make
 
 This is how he did assignment 3 where we first examined if practices changed overtime in general without any predictors. 
 
-```{r}
+```{r conditional, warning=FALSE, message=FALSE}
 
 
 
@@ -152,7 +152,7 @@ In this case, wave does seem to be significant.
 
 Here we are adding in locale, percent bipoc, and percent frpl as predictors in our model. 
 
-```{r}
+```{r predictors, warning=FALSE, message=FALSE}
 
 GLMMfix <- glmer(prac_tot ~ 1 + wave + locale + cbipoc_percent + cfrpl_percent + (1|school_id), 
                   family = poisson, 
@@ -166,7 +166,7 @@ tab_model(GLMMfix)
 ### Model check Conditional 
 Is this any better than the unconditional model? 
 
-```{r, warning=FALSE, message=FALSE}
+```{r conditional check, warning=FALSE, message=FALSE}
 
 AIC(GLMMCond,GLMMfix)
 BIC(GLMMCond,GLMMfix)
@@ -184,7 +184,7 @@ The model with predictors is better than the conditional model according to the 
 The previous model did not have an interaction effect. In this model we have the interaction between wave and locale but not of percent bipoc and percent frpl.  
 
 
-```{r}
+```{r interaction, warning=FALSE, message=FALSE}
 
 
 GLMMfix1 <- glmer(prac_tot ~ 1 + wave + 
@@ -212,7 +212,7 @@ In this model it seems like the interaction between wave and urban location was 
 ### Model check Interaction   
 Is this any better than the model without the interaction term? 
 
-```{r, warning=FALSE, message=FALSE}
+```{r interaction check, warning=FALSE, message=FALSE}
 
 AIC(GLMMfix,GLMMfix1)
 BIC(GLMMfix,GLMMfix1)
@@ -222,13 +222,13 @@ test_lrt(GLMMfix,GLMMfix1)
 
 ```
 
-Based on AIC and BIC the model without the interaction term is a better model. 
+Based on AIC and BIC the model without the interaction term is a better model but barely, it is so very very close: p = 0.051.  
 
 ## Predictors of growth  
 
 Here we add a model with interaction effects between not only locale but percent bipoc and percent frpl as well.  
 
-```{r}
+```{r interactions, warning=FALSE, message=FALSE}
 
 GLMMfix2 <- glmer(prac_tot ~ 1 + wave + 
                     locale + 
@@ -250,7 +250,7 @@ summary(GLMMfix2)
 ### Model check Interactions   
 **Interaction: Wave X Locale , Wave X Percent FRPL , Wave X Percent BIPOC**
 
-```{r}
+```{r interactions check, warning=FALSE, message=FALSE}
 
 AIC(GLMMfix1,GLMMfix2)
 BIC(GLMMfix1,GLMMfix2)
@@ -263,20 +263,7 @@ The second model does not seem to be better which would make sense given that we
 
 # Plots  
 
-```{r, warning=FALSE, message=FALSE}
-plot_model(GLMMfix) + theme_classic () 
-
-plot_model(GLMMfix,type = "eff")$wave + theme_classic () # plot the effect of Time (Wave) 
-
-plot_model(GLMMfix,type = "eff")$locale + theme_classic () # plot the effect of locale 
- 
-interact_plot(model=GLMMfix, pred = wave, modx = locale) # Enter the predictor of growth in the final model 
-```
-
-
-
-## Another Plot  
-
+**Not using a model**
 ```{r, warning=FALSE, message=FALSE}
 localegg <- summarySE(na.omit(main), measurevar="prac_tot", groupvars=c("locale","wave")) 
 
@@ -300,20 +287,62 @@ ggplot(localegg, aes(x=wave, y=prac_tot, color=locale)) +
 
 ```
 
+## No Interaction Model  
 
-## Tab Model  
+```{r, warning=FALSE, message=FALSE}
+plot_model(GLMMfix) + theme_classic () 
+
+plot_model(GLMMfix,type = "eff")$wave + theme_classic () # plot the effect of Time (Wave) 
+
+plot_model(GLMMfix,type = "eff")$locale + theme_classic () # plot the effect of locale 
+ 
+interact_plot(model=GLMMfix, pred = wave, modx = locale) # Enter the predictor of growth in the final model 
+```
+
+
+## Interaction Model
+
+```{r, warning=FALSE, message=FALSE}
+plot_model(GLMMfix1) + theme_classic () 
+
+plot_model(GLMMfix1,type = "eff")$wave + theme_classic () # plot the effect of Time (Wave) 
+
+plot_model(GLMMfix1,type = "eff")$locale + theme_classic () # plot the effect of locale 
+ 
+interact_plot(model=GLMMfix1, pred = wave, modx = locale) # Enter the predictor of growth in the final model 
+```
+
+
+
+# Tab Models  
+
+## No interaction Model  
 **Using the Predictor model with no interaction term**
-Rated as the best model based on test of fit and AIC and BIC.  
+Rated as the best model based on test of fit and BIC.  
 
-```{r tab model}
+```{r tab model pred}
 
 tab_model(GLMMfix)
 
 ```
 
+## Interaction Model  
+**Using the Predictor model with an interaction term between Locale X Wave**
+Better according to AIC  
+
+```{r tab model inter}
+
+tab_model(GLMMfix1)
+
+```
+
+
 # Imputed Data
 
 If needed, here is the model with imputed data, if the MCAR test determines that the missing data is not at random. 
+
+## Missing data  
+**Examines the missing data in the main dataset**  
 
 ```{r}
 library(lmerTest)
@@ -321,16 +350,18 @@ library(mice)
 library(broom.mixed)
 library(mitml)
 
-md.pattern(main, rotate.names = T)
+main_missing <- main %>% select(school_name, school_state, prac_tot, wave, bipoc_percent, frpl_percent, locale)
+md.pattern(main_missing, rotate.names = T)
 
 
 ```
 
-Tells us where the missing data is though I don't completely know how to read it. 
+Tells us where the missing data. 442 complete observations.
 
-Okay this is from stackoverflow and is suggested as a way to manage missing data. It allows me to run the model, but I am not sure it is needed.
+## Imputed data
+This is the imputed data that tries to compensate for the missing data. Although our missing data is not completely at random, we are going to run the model to compare.  
 
-```{r}
+```{r, warning=FALSE, message=FALSE}
 #Someone online suggested this package to impute data
 
 #### Impute ####
