@@ -348,7 +348,8 @@ plot_model(GLMMfix,type = "eff")$wave + theme_classic () # plot the effect of Ti
 
 plot_model(GLMMfix,type = "eff")$locale + theme_classic () # plot the effect of locale 
  
-interact_plot(model=GLMMfix, pred = wave, modx = locale) # Enter the predictor of growth in the final model 
+interact_plot(model=GLMMfix, pred = wave, modx = locale)+
+  labs(x = "Wave", y = "Total Social Justice Practices") # Enter the predictor of growth in the final model 
 ```
 
 
@@ -361,7 +362,9 @@ plot_model(GLMMfix1,type = "eff")$wave + theme_classic () # plot the effect of T
 
 plot_model(GLMMfix1,type = "eff")$locale + theme_classic () # plot the effect of locale 
  
-interact_plot(model=GLMMfix1, pred = wave, modx = locale) # Enter the predictor of growth in the final model 
+interact_plot(model=GLMMfix1, pred = wave, modx = locale) +
+  labs(x = "Wave", y = "Total Social Justice Practices")
+# Enter the predictor of growth in the final model 
 ```
 
 
@@ -437,6 +440,108 @@ testEstimates(as.mitml.result(fit),
 ```
 
 Compare imputed model and out model (missing data)
+
+
+# State Level Data  
+
+## Examining State Data  
+
+Frequency counts of schools by state over the years.  
+
+```{r}
+
+main$school_state[373] <- "South Carolina"
+main$school_state[136] <- "California"
+main$school_state[377] <- "Washington"
+main$school_state[54] <- "New York"
+
+main_count <- main %>%
+  filter(school_state != "NA") %>%
+  group_by(year) %>%
+  dplyr::count(school_state)
+
+
+main_count %>%
+  filter(school_state != "")%>%
+  group_by("year")%>%
+  ggplot(aes(x = n, y = reorder(school_state, n)))+
+  geom_col(aes(fill= school_state), show.legend = FALSE) +
+  scale_fill_viridis_d(option = "magma", direction = -1)+
+  labs(x = "Number of Schools", y = "")+
+  facet_wrap(~year, nrow = 1)+
+  theme_minimal()
+
+
+```
+
+
+Interestingly, Colorado, California, Michigan, New York, and Texas are consistently in the top 5 for innovative schools across the years.  
+
+## State Random Model  
+
+After examining the data by states, we decided to allow the state data to vary with random intercepts.  
+
+```{r state vary}
+
+
+GLMMRand1 <- glmer(prac_tot ~ 1 + wave + 
+                    locale + 
+                    cbipoc_percent + 
+                    cfrpl_percent + 
+                    locale*wave +
+                    (1|school_id) +
+                     (1|school_state), 
+                  family = poisson, 
+                  data = main) 
+summary(GLMMRand1)
+tab_model(GLMMRand1)
+
+```
+
+
+
+```{r random check, warning=FALSE, message=FALSE}
+
+AIC(GLMMfix1,GLMMRand1)
+BIC(GLMMfix1,GLMMRand1)
+
+test_lrt(GLMMfix1,GLMMRand1)
+
+```
+
+
+Although AIC and BIC are essnetially the same, the Random effects model is considered significantly better using the LRT test.  
+
+But let's see if we can account for starting points.  
+
+```{r}
+schools_2018_19 <- import(here("data/schools_2018-19.csv"))
+
+```
+
+
+Look at school type (Public/private), charter, magnet.  
+
+Include "level" - aka high school, elementary, middle, middle/high school  
+
+title 1 status - "title_i_status"
+
+```{r state varies}
+
+
+GLMMRand2 <- glmer(prac_tot ~ 1 + wave + 
+                    locale + 
+                    cbipoc_percent + 
+                    cfrpl_percent + 
+                    locale*wave +
+                    (1|school_id) +
+                     (1|school_state), 
+                  family = poisson, 
+                  data = main) 
+summary(GLMMRand2)
+tab_model(GLMMRand2)
+
+```
 
 
 
