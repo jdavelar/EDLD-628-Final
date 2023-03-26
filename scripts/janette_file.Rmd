@@ -362,4 +362,62 @@ states <- main %>%
 #export(states, "states.csv")
 ```
 
+# Pulling descriptives for paper
+
+```{r desc}
+#geographic locale by year
+#2018-19
+geo_19 <- main %>% 
+  select(year, locale, school_name) %>% 
+  filter(year == 2019) %>% 
+  mutate(value = rep(1, 173)) %>% 
+  group_by(locale) %>% 
+  summarize(sum(value))
+# urban = 93
+# suburban = 38
+# rural = 41
+#2020-21
+geo_21 <- main %>% 
+  select(year, locale, school_name) %>% 
+  filter(year == 2021) %>% 
+  mutate(value = rep(1, 232)) %>% 
+  group_by(locale) %>% 
+  summarize(sum(value))
+# urban = 135
+# suburban = 39
+# rural = 55
+#2021-22
+geo_22 <- main %>% 
+  select(year, locale, school_name) %>% 
+  filter(year == 2022) %>% 
+  mutate(value = rep(1, 161)) %>% 
+  group_by(locale) %>% 
+  summarize(sum(value))
+# urban = 98
+# suburban = 28
+# rural = 33
+
+# full sample
+geo <- main %>% 
+  select(year, locale, school_name) %>% 
+  mutate(value = rep(1, 566)) %>% 
+  group_by(locale) %>% 
+  summarize(sum(value))
+```
+
+# Visualization for %BIPOC & %FRPL
+
+
+```{r type}
+main$year <- as.factor(main$year)
+frpl_viz <- ggplot(main, aes(year, frpl_percent, group = year)) +
+  geom_boxplot() +
+  theme_minimal()
+# save(frpl_viz, file = "frpl_viz.png")
+
+bipoc_viz <- ggplot(main, aes(year, bipoc_percent, group = year)) +
+  geom_boxplot() + 
+  theme_minimal()
+# save(bipoc_viz, file = "bipoc_viz.png")
+```
 

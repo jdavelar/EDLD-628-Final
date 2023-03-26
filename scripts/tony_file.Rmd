@@ -545,3 +545,10 @@ tab_model(GLMMRand2)
 
 
 
+```{r}
+modelsummary::msummary(list(
+  "Null Model" = GLMMCond, 
+  "Model 1" = GLMMfix,
+  "Model 2" = GLMMfix1))
+```
+
