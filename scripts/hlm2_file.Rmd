@@ -1,0 +1,65 @@
+---
+title: "EDLD629 Final"
+author: "Janette Avelar & Tony Daza"
+date: '2023-06-08'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(here)
+library(psych)
+library(tidyverse)
+library(DT)
+load(here("data", "updated-canopy-schools.Rdata"))
+```
+
+# Descriptives
+
+## Updated summary of locale by year
+
+*Note:* Missing locale value indicates locale held a missing value.
+
+```{r locale descriptives}
+loc_desc <- main %>% 
+  mutate(rate = rep(1, nrow(.))) %>% 
+  group_by(year, locale) %>% 
+  summarize(N = sum(rate))
+datatable(loc_desc)
+```
+
+## Updated boxplots for FRPL & BIPOC percentages
+
+The average percentage of BIPOC students for the updated 2022-23 data is higher than previous years!
+
+```{r descriptive boxplots}
+frpl_viz <- ggplot(main, aes(year, frpl_percent, group = year)) +
+  geom_boxplot() +
+  theme_minimal()
+# save(frpl_viz, file = "frpl_viz-updated.png")
+
+bipoc_viz <- ggplot(main, aes(year, bipoc_percent, group = year)) +
+  geom_boxplot() + 
+  theme_minimal()
+# save(bipoc_viz, file = "bipoc_viz-updated.png")
+```
+
+## Average implementation across years by locale
+
+```{r average linechart}
+desc_imp <- main %>% 
+  #creating a composite practice score for each school
+  group_by(school_id) %>% 
+  mutate(comp_prac = sum(prac_culture + prac_sel_assess + prac_community + prac_marginalized + prac_mental + prac_restorative + prac_sel_curriculum + prac_sel_integrated + prac_resources)) %>% 
+  ungroup() %>% 
+  #create an average implementation score for each year
+  group_by(year, locale) %>% 
+  filter(!is.na(locale)) %>% 
+  filter(!locale == "") %>% 
+  summarize(avg_prac = mean(comp_prac))
+#build plot
+ggplot(desc_imp, aes(year, avg_prac, group = locale, color = locale)) +
+  geom_line()
+```
+
+Should recreate the plots above with regional data

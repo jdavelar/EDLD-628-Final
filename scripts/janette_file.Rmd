@@ -421,3 +421,71 @@ bipoc_viz <- ggplot(main, aes(year, bipoc_percent, group = year)) +
 # save(bipoc_viz, file = "bipoc_viz.png")
 ```
 
+# Add newest wave of data (2022-23)
+
+**Really important note** One thing I noticed in manually entering missing locale information is that *some school names are not matching up across years*. Therefore, when we build models, we should use school ID and not school name as unique identifiers.
+
+```{r}
+merge_2023 <- import(here("data", "schools_2022-23.csv")) %>% 
+  select(nces_id, school_id, school_name, school_state, practices_culturally_responsive, practices_assessments_sel, practices_community_supports, practices_mental_health, practices_restorative, practices_design_marginalized, practices_sel_curriculum, practices_sel_integrated, practices_reallocation_resources, self_reported_locale_suburban, self_reported_locale_urban, self_reported_locale_rural, self_reported_frpl, self_reported_race_white) %>% 
+  #create matching vars
+  mutate(wave = rep(4, nrow(.)),
+         year = rep(2023, nrow(.)),
+         year = as.factor(year)) %>% 
+  group_by(school_id) %>% 
+  mutate(bipoc_percent = 100-self_reported_race_white) %>% 
+  ungroup() %>% 
+  #determine multiple categories
+  mutate(multiple = case_when(
+    self_reported_locale_rural == 1 & self_reported_locale_suburban == 1 ~ 1,
+    self_reported_locale_rural == 1 & self_reported_locale_urban == 1 ~ 1,
+    self_reported_locale_urban == 1 & self_reported_locale_suburban == 1 ~ 1),
+    #locale using existing variables
+    locale = case_when(
+      self_reported_locale_rural == 1 ~ "Rural",
+      self_reported_locale_suburban == 1 ~" Suburban",
+      self_reported_locale_urban == 1 ~ "Urban"),
+    locale = case_when(
+      #over write with manual recode where locale == multiple using NCES ID
+      school_id == 784 ~ "Suburban", #Manchester HS
+      school_id == 780 ~ "Rural", #Hartford Area Career & Tech Center
+      school_id == 715 ~ "Suburban", #Las Américas ASPIRA
+      school_id == 699 ~ "Urban", #Building 21 Allentown
+      school_id == 688 ~ "Suburban", #Alabama Aerospace and Aviation High School
+      school_id == 683 ~ "Suburban", #Lighthouse Holyoke
+      school_id == 659 ~ "Urban", #St. Patrick Catholic School
+      school_id == 655 ~ "Urban", #Kilombo Academic and Cultural Institute
+      school_id == 649 ~ "Rural", #Portland Middle School
+      school_id == 638 ~ NA, #Prospect Academy
+      school_id == 637 ~ "Rural", #Goshen Post Elementary
+      school_id == 588 ~ "Urban", #Texas Tech University K-12
+      school_id == 499 ~ "Urban", #Village High School
+      school_id == 472 ~ "Urban", #Burlington City & Lake Semester
+      school_id == 466 ~ "Rural", #The Forest School
+      school_id == 455 ~ "Rural", #Uxbridge High School
+      school_id == 384 ~ "Rural", #Gull Lake Virtual Partnership
+      school_id == 383 ~ "Suburban", #Oxford Virtual Academy
+      school_id == 371 ~ "Suburban", #Washtenaw Alliance for Virtual Education (WAVE)
+      school_id == 368 ~ "Urban", #Verdi EcoSchool
+      school_id == 325 ~ "Urban", #NuVu Innovation School
+      school_id == 293 ~ NA, #Iowa BIG
+      school_id == 262 ~ "Rural", #Durango Big Picture High School
+      school_id == 236 ~ "Urban", #5280 High School
+      school_id == 234 ~ "Suburban", #Virtual Learning Academy
+      school_id == 150 ~ "Urban", #One Stone
+      school_id == 70 ~ "Urban", #Evergreen Community Charter School
+      school_id == 41 ~ "Urban", #CodeRVA Regional High School
+      #keep all other existing values
+      TRUE ~ as.character(locale)
+    )) %>%  #leaves 3 true NAs
+  select(nces_id, school_id, school_name, school_state, prac_culture = practices_culturally_responsive, prac_sel_assess = practices_assessments_sel, prac_community = practices_community_supports, prac_mental = practices_mental_health, prac_restorative = practices_restorative, prac_marginalized = practices_design_marginalized, prac_sel_curriculum = practices_sel_curriculum, prac_sel_integrated = practices_sel_integrated, prac_resources = practices_reallocation_resources, locale, frpl_percent = self_reported_frpl, bipoc_percent, year, wave)
+#save dataset
+schools_2023 = merge_2023
+#merge data
+main <- main %>% 
+  full_join(merge_2023, by = c("nces_id", "school_id", "year", "wave", "school_name", "school_state", "locale", "frpl_percent", "bipoc_percent", "prac_culture", "prac_sel_assess", "prac_community", "prac_mental", "prac_restorative", "prac_marginalized", "prac_sel_curriculum", "prac_sel_integrated", "prac_resources"))
+# save new dataset
+# save(main, schools_2019, schools_2021, schools_2022, schools_2023,
+#      file = "updated-canopy-schools.RData")
+```
+
