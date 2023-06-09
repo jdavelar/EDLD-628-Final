@@ -49,8 +49,8 @@ bipoc_viz <- ggplot(main, aes(year, bipoc_percent, group = year)) +
 ```{r average linechart}
 desc_imp <- main %>% 
   #creating a composite practice score for each school
-  group_by(school_id) %>% 
-  mutate(comp_prac = sum(prac_culture + prac_sel_assess + prac_community + prac_marginalized + prac_mental + prac_restorative + prac_sel_curriculum + prac_sel_integrated + prac_resources)) %>% 
+  group_by(year, school_id) %>% 
+  mutate(comp_prac = sum(prac_culture + prac_sel_assess + prac_community + prac_marginalized + prac_mental + prac_restorative + prac_sel_curriculum + prac_sel_integrated + prac_resources, na.rm = TRUE)) %>% 
   ungroup() %>% 
   #create an average implementation score for each year
   group_by(year, locale) %>% 
