@@ -13,7 +13,6 @@ output:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-library(tidyverse)
 library(psych)
 library(rio)
 library(lme4)  
@@ -27,6 +26,10 @@ library(performance)
 library(sjPlot)
 library(interactions) 
 library(modelsummary)
+<<<<<<< Updated upstream
+=======
+library(tidyverse)
+>>>>>>> Stashed changes
 ```
 
 # Innovative School Practices   
@@ -61,6 +64,237 @@ summary(main)
 
 ```
 
+
+```{r}
+# 2016 Political Data. 
+library(readxl)
+
+
+pres_16 <- import("~/Desktop/prez_election_16.csv")
+
+
+
+```
+
+
+```{r}
+
+library(datasets)
+
+region <- as.data.frame(state.region)
+region <- region %>% dplyr::mutate(State_ID = row_number())
+
+
+states <- as.data.frame(state.name)
+states <- states %>% dplyr::mutate(State_ID = row_number())
+
+subregion <- as.data.frame(state.division)
+subregion <- subregion %>% dplyr::mutate(State_ID = row_number())
+
+# I realized that this data set doesn't have the District of Columbia 
+# It leads to some NA values
+# I will sort them out later and for now just filter them out
+
+abbr <- as.data.frame(state.abb)
+abbr <- abbr %>% dplyr::mutate(State_ID = row_number())
+
+regions <- dplyr::full_join(states, subregion, by = "State_ID")
+regions <- dplyr::full_join(regions, abbr, by = "State_ID")
+regions <- dplyr::full_join(regions, region, by = "State_ID")
+regions$state.division[[8]] <- "Middle Atlantic"
+regions$state.region[[8]] <- "Northeast"
+# For some reason Delaware was listed as the South and that seemed wrong. 
+regions$state.division[[32]] <- "New England"
+
+
+# New row for DC 
+DC <- data.frame(state.name = "District of Columbia",
+                 State_ID = 51,
+                 state.division = "Middle Atlantic",
+                 state.region = "Northeast",
+                 state.abb = "DC")
+
+# Adding in DC
+regions <- rbind(regions, DC)
+
+
+```
+
+
+**Adding State Info to politics**
+```{r}
+library(dplyr)
+pres_16 <- pres_16 %>% dplyr::rename(state.abb = STATE)
+pres_16 <- dplyr::full_join(pres_16, regions, by = "state.abb")
+pres_16 <- pres_16 %>% select(-c("State_ID", "state.abb", "All Other Parties"))
+pres_16 <- pres_16 %>% dplyr::rename(school_state = state.name)
+pres_16 <- pres_16 %>% dplyr::rename(school_region = state.region)
+pres_16 <- pres_16 %>% dplyr::rename(school_subregion = state.division)
+
+pres_16 <- pres_16 %>% mutate(pct_dem = round(((`Democrat Popular`/`Total Vote`)*100),2))
+
+
+
+# Determine quantile thresholds for splitting categories
+quantiles <- quantile(pres_16$pct_dem, probs = c(0, 1/3, 2/3, 1))
+
+# Creating a new variable indicating the political affiliation based on percent voting democrat
+pres_16 <- pres_16 %>%
+  mutate(Political_Affiliation = case_when(
+    pct_dem >= quantiles[3] ~ "Democrat",
+    pct_dem >= quantiles[2] ~ "Neutral",
+    TRUE ~ "Conservative"
+  ))
+
+# But does that show the same thing as electoral college?
+
+pres_16 <- pres_16 %>%
+  mutate(`Republican Electoral` = replace(`Republican Electoral`, is.na(`Republican Electoral`), 0),
+         `Democrat Electoral` = replace(`Democrat Electoral`, is.na(`Democrat Electoral`), 0))
+# Hawaii splits electoral votes
+pres_16$`Democrat Electoral`[[12]] <- 3
+# Washington splits electoral votes
+pres_16$`Democrat Electoral`[[48]] <- 8
+# Texas splits electoral votes
+pres_16$`Republican Electoral`[[44]] <- 36
+
+pres_16 <- pres_16 %>%
+  dplyr::mutate(`Republican Electoral` = as.numeric(`Republican Electoral`),
+        `Democrat Electoral` =  as.numeric(`Democrat Electoral`))
+
+# Now we can add the electoral votes
+# Will need to fix Hawaii, Washington, and Texas
+pres_16 <- pres_16 %>%
+  group_by(school_state) %>%
+  dplyr::mutate(Electoral_Total = `Republican Electoral` + `Democrat Electoral`)
+
+# Hawaii has 4 electoral votes
+pres_16$Electoral_Total[[12]] <- 4
+# Washington has 12 electoral votes
+pres_16$Electoral_Total[[48]] <- 12
+# Texas has 38 electoral votes
+pres_16$Electoral_Total[[44]] <- 38
+
+# Now we will determine if the state's electoral votes went primarily to Republicans or democrats 
+pres_16 <- pres_16 %>% mutate(electoral_pct_dem = round(((`Democrat Electoral`/Electoral_Total)*100),2))
+
+# Now a new category of state party by electoral college. 
+pres_16 <- pres_16 %>% mutate(Political_Aff_2 = case_when(
+    electoral_pct_dem >= 50 ~ "Democrat",
+    TRUE ~ "Conservative"
+  ))
+
+state_party <- pres_16 %>% select(c("school_state", "Political_Affiliation", "Political_Aff_2"))
+
+```
+
+
+```{r}
+main$school_state[[54]] <- "New York"
+main$school_state[[136]] <- "California"
+main$school_state[[373]] <- "South Carolina"
+main$school_state[[377]] <- "Washington"
+
+
+regions <- regions %>% select(-"State_ID")
+regions <- regions %>% dplyr::rename(school_state = state.name)
+regions <- regions %>% dplyr::rename(school_region = state.region)
+regions <- regions %>% dplyr::rename(school_subregion = state.division)
+
+
+full_region <- left_join(main, regions, by = "school_state")
+
+full_region <- left_join(full_region, state_party, by = "school_state")
+
+full_region %>%
+  filter(school_state != "Puerto Rico") %>%
+  filter(locale != "") %>%
+  dplyr::group_by(school_region, locale) %>%
+  dplyr::summarize(counts = n()) %>%
+  ggplot(aes(x = reorder(locale, counts), y = counts, fill = school_region)) +
+  geom_col(position = "dodge") + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) + 
+  coord_flip() +
+  theme_minimal() +
+  labs(title = "Canopy Learning Environments by Region and Locale",
+       subtitle = "Schools with no locale data and \na from Puerto Rico is currently excluded",
+       x = "",
+       y = "")
+
+full_region %>%
+  filter(school_state != "Puerto Rico") %>%
+  filter(locale != "") %>%
+  dplyr::group_by(Political_Affiliation, locale) %>%
+  dplyr::summarize(counts = n()) %>%
+  ggplot(aes(x = reorder(locale, counts), y = counts, fill = Political_Affiliation)) +
+  geom_col(position = "dodge") + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) + 
+  coord_flip() +
+  theme_minimal() +
+  labs(title = "Canopy Learning Environments by Urbanicity and Political Leaning",
+       subtitle = "Schools with no locale data and \na school from Puerto Rico are currently excluded \nbased on 2016 Presidential Election Popular Vote",
+       x = "",
+       y = "")
+
+
+full_region %>%
+  filter(school_state != "Puerto Rico") %>%
+  filter(locale != "") %>%
+  dplyr::group_by(Political_Aff_2, locale) %>%
+  dplyr::summarize(counts = n()) %>%
+  ggplot(aes(x = reorder(locale, counts), y = counts, fill = Political_Aff_2)) +
+  geom_col(position = "dodge") + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) + 
+  coord_flip() +
+  theme_minimal() +
+  labs(title = "Canopy Learning Environments by Urbanicity and Political Leaning",
+       subtitle = "Schools with no locale data and \na school from Puerto Rico are currently excluded \nbased on 2016 Presidential Election Electoral Vote",
+       x = "",
+       y = "")
+
+
+full_region %>%
+  filter(school_state != "Puerto Rico") %>%
+  filter(locale != "") %>%
+  dplyr::group_by(Political_Aff_2, school_region) %>%
+  dplyr::summarize(counts = n()) %>%
+  ggplot(aes(x = reorder(school_region, counts), y = counts, fill = Political_Aff_2)) +
+  geom_col(position = "dodge") + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) + 
+  coord_flip() +
+  theme_minimal() +
+  labs(title = "Canopy Learning Environments by Political Leaning and Region",
+       subtitle = "Schools with no locale data and \na school from Puerto Rico are currently excluded \nbased on 2016 Presidential Election Electoral Vote",
+       x = "",
+       y = "")
+
+```
+
+
+```{r}
+
+full_region %>%
+  filter(school_state != "Puerto Rico") %>%
+  filter(locale != "") %>%
+  dplyr::group_by(school_subregion, locale) %>%
+  dplyr::summarize(counts = n()) %>%
+  ggplot(aes(x = reorder(locale, counts), y = counts, fill = school_subregion)) +
+  geom_col(position = "dodge") + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) + 
+  coord_flip() +
+  theme_minimal() +
+  labs(title = "Canopy Learning Environments by Sub Region \nand Locale",
+       subtitle = "Schools with no locale data and \na from Puerto Rico is currently excluded",
+       x = "",
+       y = "")
+
+
+
+
+```
+
+
+
 ## Examining data to model   
 
 ```{r desript plot}
@@ -92,6 +326,8 @@ main %>%
   ggplot(aes(x = prac_tot)) +
   geom_bar(fill= "darkorchid2") +
   theme_minimal()
+
+
 
 ```
 
@@ -340,6 +576,46 @@ ggplot(localegg, aes(x=wave, y=prac_tot, color=locale)) +
 
 ```
 
+
+```{r, fig.height=8, fig.width=10, warning = FALSE, message=FALSE}
+localegg2 <- summarySE(na.omit(full_region), measurevar="prac_tot", groupvars=c("locale","wave", "school_region")) 
+
+localegg2$wave<-as.numeric(localegg2$wave)
+
+# Use 95% confidence interval instead of SEM
+
+ggplot(localegg2, aes(x=wave, y=prac_tot, color=locale)) + 
+  geom_errorbar(aes(ymin=prac_tot-ci, ymax=prac_tot+ci), width=.1, position=pd) +
+  ylab("Total Practices") +
+  ylim(0,9) +
+  facet_wrap(~school_region) +
+  geom_line(position=pd) +
+  geom_point(position=pd) + theme_classic() + 
+  scale_color_manual(values=c("cornflowerblue", "chocolate1", "darkorchid2")) +
+  ggtitle("Locale x Group x Region \nBy Time with 95% Mean CIs") +
+  theme(plot.title = element_text(hjust = 0.5, lineheight=.8, face="bold"))
+```
+
+```{r, fig.height=10, fig.width=10, warning=FALSE, message=FALSE}
+localegg3 <- summarySE(na.omit(full_region), measurevar="prac_tot", groupvars=c("locale","wave", "school_subregion")) 
+
+localegg3$wave<-as.numeric(localegg3$wave)
+
+# Use 95% confidence interval instead of SEM
+
+ggplot(localegg3, aes(x=wave, y=prac_tot, color=locale)) + 
+  geom_errorbar(aes(ymin=prac_tot-ci, ymax=prac_tot+ci), width=.1, position=pd) +
+  ylab("Total Practices") +
+  ylim(0,9) +
+  facet_wrap(~school_subregion) +
+  geom_line(position=pd) +
+  geom_point(position=pd) + theme_classic() + 
+  scale_color_manual(values=c("cornflowerblue", "chocolate1", "darkorchid2")) +
+  ggtitle("Locale x Group X Sub Region \nBy Time with 95% Mean CIs") +
+  theme(plot.title = element_text(hjust = 0.5, lineheight=.8, face="bold"))
+```
+
+
 ## No Interaction Model  
 
 ```{r, warning=FALSE, message=FALSE}
@@ -441,10 +717,15 @@ Compare imputed model and out model (missing data)
 
 # Compare models
 
+# Model Summary   
+**No State Level Control**  
+
 ```{r}
 modelsummary::msummary(list(
   "Null Model" = GLMMCond, 
   "Model 1" = GLMMfix,
-  "Model 2" = GLMMfix1))
+  "Model 2" = GLMMfix1,
+  "Model 3" = GLMMRand1), 
+  stars = TRUE)
 ```
 
