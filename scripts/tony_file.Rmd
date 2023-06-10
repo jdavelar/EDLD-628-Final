@@ -23,7 +23,6 @@ library(DT)
 library(here)
 library(naniar)
 library(performance)
-library(sjPlot)
 library(interactions) 
 library(modelsummary)
 library(tidyverse)
@@ -334,7 +333,6 @@ Here we are running an MCAR test to examing to see if the missing data for local
 
 ```{r missing, warning=FALSE}
 
- 
 main$cbipoc_percent <- c(scale(main$bipoc_percent,  center=TRUE, scale=TRUE)) 
 main$cfrpl_percent <- c(scale(main$frpl_percent,  center=TRUE, scale=TRUE))
 
@@ -344,8 +342,6 @@ main_mcar <- main %>%
 main_mcar$locale <- as.numeric(main_mcar$locale)
 
 mcar_test(main_mcar)
-
-
 
 
 ```
@@ -409,7 +405,7 @@ wilcox.test(locale ~ group, data = main_test)
 ```
 Based on an examination of the mean differences between groups of complete data schools and missing data schools, it seems like there is no difference in the mean total practices of schools with missing frpl and bipoc data compared to schools with complete data. 
 
-When examining the location data, there is a difference between complete data schools and missing data schools with regard to location data. Complete data schools had a higher percentage of rural schools (25% to 14% in the missing data group) as well as a higher percentage of suburban schools (19% to 17%). Alternatively, the missing data group had a higher percentage of urban schools (65% compared to 56% of Urban schools in the complete data group).
+When examining the location data, there is a difference between complete data schools and missing data schools with regard to location data. Complete data schools had a higher percentage of rural schools (24% to 15% in the missing data group) as well as a higher percentage of suburban schools (18% to 17%). Alternatively, the missing data group had a higher percentage of urban schools (62% compared to 58% of Urban schools in the complete data group).
 
 
 ## Fixed Effects  

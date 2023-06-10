@@ -2,13 +2,20 @@
 title: "EDLD629 Final"
 author: "Janette Avelar & Tony Daza"
 date: '2023-06-08'
-output: html_document
+output: 
+  html_document:
+    toc: true
+    toc_depth: 3
+    toc_float: true 
+    code_folding: hide
+    theme: cerulean
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 library(here)
 library(psych)
+library(rio)
 library(tidyverse)
 library(DT)
 load(here("data", "updated-canopy-schools.Rdata"))
@@ -258,14 +265,15 @@ full_region$school_state[[632]] <- "District of Columbia"
 
 table(full_region$locale)
 
+full_region$locale <- fct_collapse(full_region$locale, "Suburban" = c("Suburban", "Suburban"))
 ```
 
 # Descriptive Data  
-## Plots  
+## Region, Urbanicity, Political Plots  
 ```{r}
+
 full_region %>%
-  filter(school_state != "Puerto Rico") %>%
-  filter(locale != "") %>%
+  filter(school_state != "Puerto Rico" & complete.cases(school_region, locale, school_state)) %>%
   dplyr::group_by(school_region, locale) %>%
   dplyr::summarize(counts = n()) %>%
   ggplot(aes(x = reorder(locale, counts), y = counts, fill = school_region)) +
@@ -276,11 +284,11 @@ full_region %>%
   labs(title = "Canopy Learning Environments by Region and Locale",
        subtitle = "Schools with no locale data and \na from Puerto Rico is currently excluded",
        x = "",
-       y = "")
+       y = "",
+       fill = "Region")
 
 full_region %>%
-  filter(school_state != "Puerto Rico") %>%
-  filter(locale != "") %>%
+  filter(school_state != "Puerto Rico" & complete.cases(locale, Political_Affiliation, school_state)) %>%
   dplyr::group_by(Political_Affiliation, locale) %>%
   dplyr::summarize(counts = n()) %>%
   ggplot(aes(x = reorder(locale, counts), y = counts, fill = Political_Affiliation)) +
@@ -291,11 +299,501 @@ full_region %>%
   labs(title = "Canopy Learning Environments by Urbanicity and Political Leaning",
        subtitle = "Schools with no locale data and \na school from Puerto Rico are currently excluded \nbased on 2016 Presidential Election Popular Vote",
        x = "",
-       y = "")
+       y = "",
+       fill = "Political Affiliation")
 
-table(full_region$locale)
+
+full_region %>%
+  filter(school_state != "Puerto Rico" & complete.cases(school_state, Political_Aff_2, locale)) %>%
+  dplyr::group_by(Political_Aff_2, locale) %>%
+  dplyr::summarize(counts = n()) %>%
+  ggplot(aes(x = reorder(locale, counts), y = counts, fill = Political_Aff_2)) +
+  geom_col(position = "dodge") + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) + 
+  coord_flip() +
+  theme_minimal() +
+  labs(title = "Canopy Learning Environments by Urbanicity and Political Leaning",
+       subtitle = "Schools with no locale data and \na school from Puerto Rico are currently excluded \nbased on 2016 Presidential Election Electoral Vote",
+       x = "",
+       y = "",
+       fill = "Political Affiliation")
+
+full_region %>%
+  filter(school_state != "Puerto Rico" & complete.cases(school_state, school_region, locale)) %>%
+  dplyr::group_by(Political_Aff_2, school_region) %>%
+  dplyr::summarize(counts = n()) %>%
+  ggplot(aes(x = reorder(school_region, counts), y = counts, fill = Political_Aff_2)) +
+  geom_col(position = "dodge") + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) + 
+  coord_flip() +
+  theme_minimal() +
+  labs(title = "Canopy Learning Environments by Political Leaning and Region",
+       subtitle = "Schools with no locale data and \na school from Puerto Rico are currently excluded \nbased on 2016 Presidential Election Electoral Vote",
+       x = "",
+       y = "",
+       fill = "Political Affiliation")
+
+```
+
+## Dsitribution Plot by Year   
+
+```{r desript plot}
+
+full_region %>%
+  filter(!is.na(locale) & complete.cases(school_state)) %>%
+  group_by(locale) %>%
+ggplot(aes(x = wave, y = prac_tot )) +           
+  geom_bar(stat = "summary", fun = "mean", fill="cornflowerblue") + 
+  facet_grid(~locale) + 
+  theme_classic()+
+  labs(y = "Total Practices", x = "Wave")
+
+
+```
+
+## Descriptive Table  
+
+```{r descriptive table}
+
+datatable(round(describe(full_region[5:19], fast = TRUE, ranges = FALSE), digits = 2))
+
+```
+
+## Missing Data  
+
+```{r missing, warning=FALSE}
+library(misty)
+library(naniar)
+
+full_region$cbipoc_percent <- c(scale(full_region$bipoc_percent,  center=TRUE, scale=TRUE)) 
+full_region$cfrpl_percent <- c(scale(full_region$frpl_percent,  center=TRUE, scale=TRUE))
+
+full_mcar <- full_region %>%
+  select(wave, frpl_percent, locale, bipoc_percent, prac_tot)
+
+full_mcar$locale <- as.numeric(full_mcar$locale)
+
+mcar_test(full_mcar)
+
+na.descript(full_region) 
+na.pattern (full_region)
+
+gg_miss_var(full_region)
 
 
 ```
 
 
+There is a difference between complete cases and partial cases. Code complete and partial data and run t tests to try to predict difference between cases. If there is a mean difference, we should add that as a control in the model. 
+
+Attrition analysis: examine schools that participated over all 4 waves
+Examine means test of the two groups and report that.
+
+*Still unsure if this makes sense given Canopy's design*  
+
+### Attrition Analysis  
+
+```{r}
+
+# Group by school_id and determine if a school participated in all 4 waves
+attrition_analysis <- full_region %>%
+  group_by(school_name) %>%
+  summarize(participated_all_waves = n_distinct(wave) == 4) %>%
+  ungroup()
+
+# Join the attrition analysis results to the original data
+attrition_data <- full_region %>%
+  inner_join(attrition_analysis, by = "school_name")
+
+# Calculate means for the two groups and perform a t-test
+means_comparison <- attrition_data %>%
+  group_by(participated_all_waves) %>%
+  summarize(mean_variable = mean(prac_tot))
+
+# Perform the t-test manually
+t_test_result <- t.test(attrition_data$prac_tot ~ attrition_data$participated_all_waves)
+
+# Extract the p-value from the t-test result
+p_value <- t_test_result$p.value
+
+# Print the means and p-value
+means_comparison
+cat("p-value:", p_value, "\n")
+
+```
+
+While I am still unsure if this is necessary, it does seem like there is not a significant difference between the two groups.  
+
+
+### Examining mean differences  
+
+```{r mean differences}
+
+## Setting up the groups(Complete and incomplete data to examine mean differences)
+full_region_All <- full_region %>%
+  filter(!is.na(bipoc_percent) & !is.na(frpl_percent) & !is.na(locale) & !is.na(school_region))%>%
+  mutate(group = 1) # schools with complete data are coded 1
+
+full_region_miss <- full_region %>%
+  filter(is.na(bipoc_percent) | is.na(frpl_percent) | is.na(locale) | is.na(school_region))%>%
+  mutate(group=0) # schools with missing data are coded 0
+
+full_mean_test <- full_join(full_region_All, full_region_miss) # rejoining the data
+
+full_mean_test$group <- as.factor(full_mean_test$group) 
+
+## Testing the mean difference in total practices for complete and incomplete school data
+t.test(prac_tot ~ group, data = full_mean_test)
+
+# This suggests that the difference in practice total is not significant between school groups.
+
+# To double check because our data is not exactly normal, here is the wilcox test
+wilcox.test(prac_tot ~ group, data = full_mean_test)
+
+# Is in agreement with Welch's test that the difference in practice totals is not significant
+```
+
+Based on an examination of the mean differences between groups of complete data schools and missing data schools, it seems like there is no difference in the mean total practices of schools with missing frpl and bipoc data compared to schools with complete data. 
+
+
+
+```{r}
+## Examining the locale data for missing and complete school data
+locale_count_complete <- full_mean_test %>% filter(group == 1) %>% dplyr::count(locale)
+locale_count_complete$prct_locale <- round((locale_count_complete$n/676)*100,digits = 2)
+datatable(locale_count_complete) # Percent of each locale for complete schools data 
+
+locale_count_miss <- full_mean_test %>% filter(group == 0) %>% dplyr::count(locale)
+locale_count_miss$prct_locale <- round((locale_count_miss$n/141)*100, digits = 2)
+datatable(locale_count_miss) # percent of each locale for incomplete schools data
+
+
+full_mean_test$locale <- as.numeric(full_mean_test$locale) # need to change locale to a factor to examine the difference here.
+
+t.test(locale ~ group, data = full_mean_test)
+# Suggests that the difference in location is not significant by locale between the complete and incomplete data
+
+wilcox.test(locale ~ group, data = full_mean_test)
+# It agrees with the t test and suggests that there is not a significant difference between the locale complete and incomplete data 
+
+
+```
+When examining the location data, there was not a significant difference between complete data schools and missing data schools with regard to location data. Complete data schools had a higher percentage of rural schools (25% to 14% in the missing data group) as well as a higher percentage of suburban schools (19% to 17%). Alternatively, the missing data group had a higher percentage of urban schools (65% compared to 56% of Urban schools in the complete data group).
+
+# Modeling  
+## Conditional Model  
+
+## Fixed Effects  
+
+This is how he did assignment 3 where we first examined if practices changed overtime in general without any predictors. 
+
+```{r conditional, warning=FALSE, message=FALSE}
+library(sjPlot)
+library(lme4) 
+library(performance)
+library(interactions) 
+library(modelsummary)
+
+
+GLMMCond <- glmer(prac_tot ~ 1 + wave + (1|school_id), 
+                  family = poisson, 
+                  data = full_region) 
+summary(GLMMCond)
+tab_model(GLMMCond)
+
+```
+
+**ICC: 0.28**
+
+Total observations 817 (Before we have missing data in the predictors)
+
+In this case, wave does seem to be significant. 
+
+## Model with predictors  
+### No interaction. 
+Here we are adding in locale, percent bipoc, and percent frpl as predictors in our model. 
+
+```{r predictors, warning=FALSE, message=FALSE}
+
+GLMMfix <- glmer(prac_tot ~ 1 + wave + locale + cbipoc_percent + cfrpl_percent + (1|school_id), 
+                  family = poisson, 
+                  data = full_region) 
+
+## No interaction term here
+summary(GLMMfix)
+tab_model(GLMMfix)
+
+```
+
+
+The reference seems to be Suburban schools in the Northeast
+
+### Interaction term  
+
+This first model looks at the interaction between locale and school region but does not take into consideration wave.  
+
+```{r inter predictors, warning=FALSE, message=FALSE}
+
+GLMMfix_inter <- glmer(prac_tot ~ 1 + wave + 
+                         locale +
+                         school_region +
+                         locale*school_region + 
+                         cbipoc_percent + 
+                         cfrpl_percent + (1|school_id), 
+                  family = poisson, 
+                  data = full_region) 
+
+## No interaction term here
+summary(GLMMfix_inter)
+tab_model(GLMMfix_inter)
+
+```
+
+The reference seems to be Suburban schools and Suburban schools in the Northeast
+
+*I need help interpreting this*
+
+## Covid time varying covariate  
+
+This adds in the time varying covariate of covid but still does not have the wave interaction term.  
+
+```{r covid predictors, warning=FALSE, message=FALSE}
+
+GLMMfix_covid <- glmer(prac_tot ~ 1 + wave + locale +
+                         school_region +
+                         locale*school_region + 
+                         cbipoc_percent + 
+                         cfrpl_percent + 
+                         pre_covid + (1|school_id), 
+                  family = poisson, 
+                  data = full_region) 
+
+## No interaction term here
+summary(GLMMfix_covid)
+tab_model(GLMMfix_covid)
+
+```
+
+
+## Model check Conditional 
+Is this any better than the unconditional model? 
+
+```{r conditional check, warning=FALSE, message=FALSE}
+
+AIC(GLMMCond,GLMMfix, GLMMfix_inter, GLMMfix_covid)
+BIC(GLMMCond,GLMMfix, GLMMfix_inter, GLMMfix_covid)
+
+
+```
+
+The model with the interaction term was not better than the fixed model but the AIC and BIC improved when adding the pre_covid time varying covariate.  
+
+## Model Interactions   
+**Locale x Wave**
+**Locale X Region**  
+**Region X Wave**  
+
+The previous model did have an interaction effect, but did not have the interaction of wave. In this model we have the interaction between wave and locale, wave and school region, and locale and school region but not of percent bipoc percent frpl, and pre_covid.  
+
+**That said, I don't think it is right. I am not sure how this should look.**  
+
+```{r interaction, warning=FALSE, message=FALSE}
+
+
+GLMMfix_wave_inter <- glmer(prac_tot ~ 1 + wave + 
+                    locale + 
+                    school_region +
+                    wave*school_region +
+                    locale*school_region +
+                    cbipoc_percent + 
+                    cfrpl_percent + 
+                    pre_covid +
+                    locale*wave +
+                    (1|school_id), 
+                  family = poisson, 
+                  data = full_region) 
+summary(GLMMfix_wave_inter)
+tab_model(GLMMfix_wave_inter)
+
+
+```
+
+## Model check Interaction   
+Is this any better than the model without the interaction term? 
+
+```{r interaction check, warning=FALSE, message=FALSE}
+
+AIC(GLMMfix_covid,GLMMfix_wave_inter)
+BIC(GLMMfix_covid,GLMMfix_wave_inter)
+
+  
+test_lrt(GLMMfix_covid,GLMMfix_wave_inter) 
+
+```
+
+Based on AIC the model with the interaction term is a better model but barely, BIC shows the opposite, but the test shows that the model with the interaction term is better: p = 0.005.  
+
+
+
+
+# Plots  
+
+**Not using a model**  
+
+## Locale and Wave  
+```{r, warning=FALSE, message=FALSE}
+library(Rmisc)
+
+localegg <- summarySE(na.omit(full_region), measurevar="prac_tot", groupvars=c("locale","wave")) 
+
+localegg$wave<-as.numeric(localegg$wave)
+
+# The errorbars overlapped, so use position_dodge to move them horizontally
+pd <- position_dodge(0.1) # move them .05 to the left and right
+
+# Use 95% confidence interval instead of SEM
+
+ggplot(localegg, aes(x=wave, y=prac_tot, color=locale)) + 
+  geom_errorbar(aes(ymin=prac_tot-ci, ymax=prac_tot+ci), width=.1, position=pd) +
+  ylab("Total Practices") +
+  ylim(0,9) +
+  geom_line(position=pd) +
+  geom_point(position=pd) + theme_classic() + 
+  scale_color_manual(values=c("cornflowerblue", "chocolate1", "darkorchid2", "seagreen2")) +
+  ggtitle("Locale x Group By Time with 95% Mean CIs") +
+  theme(plot.title = element_text(hjust = 0.5, lineheight=.8, face="bold"))
+  
+
+```
+## Locale, Wave, & Region  
+
+```{r, fig.height=8, fig.width=10, warning = FALSE, message=FALSE}
+localegg2 <- summarySE(na.omit(full_region), measurevar="prac_tot", groupvars=c("locale","wave", "school_region")) 
+
+localegg2$wave<-as.numeric(localegg2$wave)
+
+# Use 95% confidence interval instead of SEM
+
+ggplot(localegg2, aes(x=wave, y=prac_tot, color=locale)) + 
+  geom_errorbar(aes(ymin=prac_tot-ci, ymax=prac_tot+ci), width=.1, position=pd) +
+  ylab("Total Practices") +
+  ylim(0,9) +
+  facet_wrap(~school_region) +
+  geom_line(position=pd) +
+  geom_point(position=pd) + theme_classic() + 
+  scale_color_manual(values=c("cornflowerblue", "chocolate1", "darkorchid2", "seagreen2")) +
+  ggtitle("Locale x Group x Region \nBy Time with 95% Mean CIs") +
+  theme(plot.title = element_text(hjust = 0.5, lineheight=.8, face="bold"))
+```
+
+## No Interaction Model  
+
+```{r, warning=FALSE, message=FALSE}
+plot_model(GLMMfix) + theme_classic () 
+
+plot_model(GLMMfix,type = "eff")$wave + theme_classic () # plot the effect of Time (Wave) 
+
+plot_model(GLMMfix,type = "eff")$locale + theme_classic () # plot the effect of locale 
+ 
+interact_plot(model=GLMMfix, pred = wave, modx = locale)+
+  labs(x = "Wave", y = "Total Social Justice Practices") # Enter the predictor of growth in the final model 
+
+
+```
+
+
+## Interaction Model
+
+```{r, warning=FALSE, message=FALSE}
+plot_model(GLMMfix_wave_inter) + theme_classic () 
+
+plot_model(GLMMfix_wave_inter,type = "eff")$wave + theme_classic () # plot the effect of Time (Wave) 
+
+plot_model(GLMMfix_wave_inter,type = "eff")$locale + theme_classic () # plot the effect of locale 
+ 
+interact_plot(model=GLMMfix_wave_inter, pred = wave, modx = locale) +
+  labs(x = "Wave", y = "Total Social Justice Practices")
+# This is a little confusing and might be wrong but seems to indicate the Urban schools were consistently higher while Rural schools have been climbing steeply
+
+interact_plot(model=GLMMfix_wave_inter, pred = wave, modx = school_region, mod2 = locale) +
+  labs(x = "Wave", y = "Total Social Justice Practices")
+# Additionally, that growth seems to be dominated by the North central "Midwest-ish" and the south.
+
+
+```
+
+This final graph is perhaps the most interesting one that we have.
+
+# Random States  
+## State Counts  
+
+```{r}
+
+state_count <- full_region %>%
+  filter(!is.na(school_state)) %>%
+  group_by(year) %>%
+  dplyr::count(school_state)
+
+
+state_count %>%
+  filter(school_state != "")%>%
+  group_by("year")%>%
+  ggplot(aes(x = n, y = reorder(school_state, n)))+
+  geom_col(aes(fill= school_state), show.legend = FALSE) +
+  scale_fill_viridis_d(option = "magma", direction = -1)+
+  labs(x = "Number of Schools", y = "")+
+  facet_wrap(~year, nrow = 1)+
+  theme_minimal()
+
+
+```
+
+Interestingly, Colorado, California, Michigan, New York, and Texas are consistently in the top 5 for innovative schools across the years. 
+
+## State Model  
+
+```{r state varies}
+
+GLMMRand2 <- glmer(prac_tot ~ 1 + wave + 
+                    locale + 
+                    cbipoc_percent + 
+                    cfrpl_percent + 
+                    locale*wave +
+                    pre_covid +
+                    school_region +
+                    locale*school_region +
+                    wave*school_region +
+                    (1|school_id) +
+                     (1|school_state), 
+                  family = poisson, 
+                  data = full_region) 
+summary(GLMMRand2)
+tab_model(GLMMRand2)
+
+```
+
+## Model Check
+
+```{r random check, warning=FALSE, message=FALSE}
+
+AIC(GLMMfix_wave_inter,GLMMRand2)
+BIC(GLMMfix_wave_inter,GLMMRand2)
+
+test_lrt(GLMMfix_wave_inter,GLMMRand2)
+
+```
+
+In this case the model with the random intercepts by state was not a better model despite having fewer degrees of freedom.  
+
+# Model Summary   
+
+ 
+
+```{r}
+modelsummary::msummary(list(
+  "Null Model" = GLMMCond, 
+  "Fixed Effects" = GLMMfix,
+  "Interaction" = GLMMfix_wave_inter,
+  "Random States" = GLMMRand2), 
+  stars = TRUE)
+```
