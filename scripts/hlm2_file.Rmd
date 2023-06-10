@@ -38,10 +38,13 @@ frpl_viz <- ggplot(main, aes(year, frpl_percent, group = year)) +
   theme_minimal()
 # save(frpl_viz, file = "frpl_viz-updated.png")
 
+
 bipoc_viz <- ggplot(main, aes(year, bipoc_percent, group = year)) +
   geom_boxplot() + 
   theme_minimal()
 # save(bipoc_viz, file = "bipoc_viz-updated.png")
+
+
 ```
 
 ## Average implementation across years by locale
@@ -58,8 +61,241 @@ desc_imp <- main %>%
   filter(!locale == "") %>% 
   summarize(avg_prac = mean(comp_prac))
 #build plot
-ggplot(desc_imp, aes(year, avg_prac, group = locale, color = locale)) +
-  geom_line()
+ggplot(desc_imp, aes(year, avg_prac,group = locale)) +
+  geom_line(aes(color = locale))+
+  theme_minimal() +
+  labs(color = "Urbanicity",
+       y = "Average Practices",
+       x = "") +
+  scale_y_continuous(n.breaks = 4)
+
 ```
 
 Should recreate the plots above with regional data
+
+Adding in total practices per year. 
+```{r}
+
+main$prac_tot <- rowSums(main[c(5,6,7,8,9,10,11,12,13)], na.rm=TRUE)
+
+main <- main %>% mutate_at(c('locale'), ~na_if(.,''))
+
+main$locale <- as.factor(main$locale)
+```
+
+Checking if my method works as well.
+```{r, include=FALSE}
+full <- main %>%
+  group_by(year, locale) %>% 
+  filter(!is.na(locale)) %>% 
+  filter(!locale == "") %>% 
+  summarize(avg_prac = round(mean(prac_tot),2))
+
+ggplot(full, aes(year, avg_prac, group = locale)) +
+  geom_line(aes(color = locale))+
+  theme_minimal() +
+  labs(color = "Urbanicity",
+       y = "Average Practices",
+       x = "") +
+  scale_y_continuous(n.breaks = 4)
+
+```
+
+
+Adding in regional data
+
+```{r}
+library(datasets)
+
+pres_16 <- import("~/Desktop/prez_election_16.csv")
+
+# Region
+######################################
+region <- as.data.frame(state.region)
+region <- region %>% dplyr::mutate(State_ID = row_number())
+
+# State name
+######################################
+states <- as.data.frame(state.name)
+states <- states %>% dplyr::mutate(State_ID = row_number())
+
+# Sub region
+######################################
+subregion <- as.data.frame(state.division)
+subregion <- subregion %>% dplyr::mutate(State_ID = row_number())
+
+# I realized that this data set doesn't have the District of Columbia 
+# It leads to some NA values
+# I will sort them out later and for now just filter them out
+
+# State abbreviation
+######################################
+abbr <- as.data.frame(state.abb)
+abbr <- abbr %>% dplyr::mutate(State_ID = row_number())
+
+# Joining all of the data
+######################################
+regions <- dplyr::full_join(states, subregion, by = "State_ID")
+regions <- dplyr::full_join(regions, abbr, by = "State_ID")
+regions <- dplyr::full_join(regions, region, by = "State_ID")
+
+# Correcting a few issues
+######################################
+regions$state.division[[8]] <- "Middle Atlantic"
+regions$state.region[[8]] <- "Northeast"
+# For some reason Delaware was listed as the South and that seemed wrong. 
+regions$state.division[[32]] <- "New England"
+
+
+# New row for DC 
+DC <- data.frame(state.name = "District of Columbia",
+                 State_ID = 51,
+                 state.division = "Middle Atlantic",
+                 state.region = "Northeast",
+                 state.abb = "DC")
+
+# Adding in DC
+regions <- rbind(regions, DC)
+
+
+```
+
+
+Adding in Political data
+
+```{r}
+
+pres_16 <- pres_16 %>% dplyr::rename(state.abb = STATE)
+pres_16 <- dplyr::full_join(pres_16, regions, by = "state.abb")
+pres_16 <- pres_16 %>% select(-c("State_ID", "state.abb", "All Other Parties"))
+pres_16 <- pres_16 %>% dplyr::rename(school_state = state.name)
+pres_16 <- pres_16 %>% dplyr::rename(school_region = state.region)
+pres_16 <- pres_16 %>% dplyr::rename(school_subregion = state.division)
+
+pres_16 <- pres_16 %>% mutate(pct_dem = round(((`Democrat Popular`/`Total Vote`)*100),2))
+
+
+
+# Determine quantile thresholds for splitting categories
+quantiles <- quantile(pres_16$pct_dem, probs = c(0, 1/3, 2/3, 1))
+
+# Creating a new variable indicating the political affiliation based on percent voting democrat
+pres_16 <- pres_16 %>%
+  mutate(Political_Affiliation = case_when(
+    pct_dem >= quantiles[3] ~ "Democrat",
+    pct_dem >= quantiles[2] ~ "Neutral",
+    TRUE ~ "Conservative"
+  ))
+
+
+# But does that show the same thing as electoral college?
+## The answer is not quite
+
+pres_16 <- pres_16 %>%
+  mutate(`Republican Electoral` = replace(`Republican Electoral`, is.na(`Republican Electoral`), 0),
+         `Democrat Electoral` = replace(`Democrat Electoral`, is.na(`Democrat Electoral`), 0))
+# Hawaii splits electoral votes
+pres_16$`Democrat Electoral`[[12]] <- 3
+# Washington splits electoral votes
+pres_16$`Democrat Electoral`[[48]] <- 8
+# Texas splits electoral votes
+pres_16$`Republican Electoral`[[44]] <- 36
+
+pres_16 <- pres_16 %>%
+  dplyr::mutate(`Republican Electoral` = as.numeric(`Republican Electoral`),
+        `Democrat Electoral` =  as.numeric(`Democrat Electoral`))
+
+# Now we can add the electoral votes
+# Will need to fix Hawaii, Washington, and Texas
+pres_16 <- pres_16 %>%
+  group_by(school_state) %>%
+  dplyr::mutate(Electoral_Total = `Republican Electoral` + `Democrat Electoral`)
+
+# Hawaii has 4 electoral votes
+pres_16$Electoral_Total[[12]] <- 4
+# Washington has 12 electoral votes
+pres_16$Electoral_Total[[48]] <- 12
+# Texas has 38 electoral votes
+pres_16$Electoral_Total[[44]] <- 38
+
+# Now we will determine if the state's electoral votes went primarily to Republicans or democrats 
+pres_16 <- pres_16 %>% mutate(electoral_pct_dem = round(((`Democrat Electoral`/Electoral_Total)*100),2))
+
+# Now a new category of state party by electoral college. 
+pres_16 <- pres_16 %>% mutate(Political_Aff_2 = case_when(
+    electoral_pct_dem >= 50 ~ "Democrat",
+    TRUE ~ "Conservative"
+  ))
+
+state_party <- pres_16 %>% select(c("school_state", "Political_Affiliation", "Political_Aff_2"))
+
+```
+
+Combining data: region, political, and main
+
+```{r}
+library(forcats)
+
+main$school_state[[54]] <- "New York"
+main$school_state[[136]] <- "California"
+main$school_state[[373]] <- "South Carolina"
+main$school_state[[377]] <- "Washington"
+
+
+regions <- regions %>% select(-"State_ID")
+regions <- regions %>% dplyr::rename(school_state = state.name)
+regions <- regions %>% dplyr::rename(school_region = state.region)
+regions <- regions %>% dplyr::rename(school_subregion = state.division)
+
+
+full_region <- left_join(main, regions, by = "school_state")
+
+full_region <- left_join(full_region, state_party, by = "school_state")
+
+full_region$school_state[[667]] <- "Florida"
+full_region$school_state[[632]] <- "District of Columbia"
+
+
+table(full_region$locale)
+
+```
+
+# Descriptive Data  
+## Plots  
+```{r}
+full_region %>%
+  filter(school_state != "Puerto Rico") %>%
+  filter(locale != "") %>%
+  dplyr::group_by(school_region, locale) %>%
+  dplyr::summarize(counts = n()) %>%
+  ggplot(aes(x = reorder(locale, counts), y = counts, fill = school_region)) +
+  geom_col(position = "dodge") + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) + 
+  coord_flip() +
+  theme_minimal() +
+  labs(title = "Canopy Learning Environments by Region and Locale",
+       subtitle = "Schools with no locale data and \na from Puerto Rico is currently excluded",
+       x = "",
+       y = "")
+
+full_region %>%
+  filter(school_state != "Puerto Rico") %>%
+  filter(locale != "") %>%
+  dplyr::group_by(Political_Affiliation, locale) %>%
+  dplyr::summarize(counts = n()) %>%
+  ggplot(aes(x = reorder(locale, counts), y = counts, fill = Political_Affiliation)) +
+  geom_col(position = "dodge") + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) + 
+  coord_flip() +
+  theme_minimal() +
+  labs(title = "Canopy Learning Environments by Urbanicity and Political Leaning",
+       subtitle = "Schools with no locale data and \na school from Puerto Rico are currently excluded \nbased on 2016 Presidential Election Popular Vote",
+       x = "",
+       y = "")
+
+table(full_region$locale)
+
+
+```
+
+

@@ -1,0 +1,833 @@
+---
+title: "tony_file"
+author: "Tony Daza"
+date: "2023-03-16"
+output: 
+  html_document:
+    toc: true
+    toc_depth: 3
+    toc_float: true 
+    code_folding: hide
+    theme: cerulean
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(psych)
+library(rio)
+library(lme4)  
+library(Rmisc)
+library(sjPlot)
+library(rempsyc)
+library(DT)
+library(here)
+library(naniar)
+library(performance)
+library(sjPlot)
+library(interactions) 
+library(modelsummary)
+library(tidyverse)
+```
+
+# Innovative School Practices   
+## Importing the Data  
+
+Thank you Janette for compiling the data!
+
+```{r import}
+
+load(here("data/canopy-schools.RData"))
+
+
+```
+
+*After looking at the data, I think we need to combine the tags into one variable as a count of number of practices if we are going to run the model as suggested*
+
+## Counting Number of Practices  
+
+```{r count}
+main$prac_tot <- rowSums(main[c(5,6,7,8,9,10,11,12,13)], na.rm=TRUE)
+
+main <- main %>% mutate_at(c('locale'), ~na_if(.,''))
+
+main$locale <- as.factor(main$locale)
+
+
+summary(main)
+
+# Looks like we have 6 NA value schools now for Locale. 
+## 91 NA values for bipoc.  
+## 117 NA values for frpl.  
+
+```
+
+
+```{r}
+# 2016 Political Data. 
+library(readxl)
+
+
+pres_16 <- import("~/Desktop/prez_election_16.csv")
+
+
+
+```
+
+
+```{r}
+
+library(datasets)
+
+region <- as.data.frame(state.region)
+region <- region %>% dplyr::mutate(State_ID = row_number())
+
+
+states <- as.data.frame(state.name)
+states <- states %>% dplyr::mutate(State_ID = row_number())
+
+subregion <- as.data.frame(state.division)
+subregion <- subregion %>% dplyr::mutate(State_ID = row_number())
+
+# I realized that this data set doesn't have the District of Columbia 
+# It leads to some NA values
+# I will sort them out later and for now just filter them out
+
+abbr <- as.data.frame(state.abb)
+abbr <- abbr %>% dplyr::mutate(State_ID = row_number())
+
+regions <- dplyr::full_join(states, subregion, by = "State_ID")
+regions <- dplyr::full_join(regions, abbr, by = "State_ID")
+regions <- dplyr::full_join(regions, region, by = "State_ID")
+regions$state.division[[8]] <- "Middle Atlantic"
+regions$state.region[[8]] <- "Northeast"
+# For some reason Delaware was listed as the South and that seemed wrong. 
+regions$state.division[[32]] <- "New England"
+
+
+# New row for DC 
+DC <- data.frame(state.name = "District of Columbia",
+                 State_ID = 51,
+                 state.division = "Middle Atlantic",
+                 state.region = "Northeast",
+                 state.abb = "DC")
+
+# Adding in DC
+regions <- rbind(regions, DC)
+
+
+```
+
+
+**Adding State Info to politics**
+```{r}
+library(dplyr)
+pres_16 <- pres_16 %>% dplyr::rename(state.abb = STATE)
+pres_16 <- dplyr::full_join(pres_16, regions, by = "state.abb")
+pres_16 <- pres_16 %>% select(-c("State_ID", "state.abb", "All Other Parties"))
+pres_16 <- pres_16 %>% dplyr::rename(school_state = state.name)
+pres_16 <- pres_16 %>% dplyr::rename(school_region = state.region)
+pres_16 <- pres_16 %>% dplyr::rename(school_subregion = state.division)
+
+pres_16 <- pres_16 %>% mutate(pct_dem = round(((`Democrat Popular`/`Total Vote`)*100),2))
+
+
+
+# Determine quantile thresholds for splitting categories
+quantiles <- quantile(pres_16$pct_dem, probs = c(0, 1/3, 2/3, 1))
+
+# Creating a new variable indicating the political affiliation based on percent voting democrat
+pres_16 <- pres_16 %>%
+  mutate(Political_Affiliation = case_when(
+    pct_dem >= quantiles[3] ~ "Democrat",
+    pct_dem >= quantiles[2] ~ "Neutral",
+    TRUE ~ "Conservative"
+  ))
+
+# But does that show the same thing as electoral college?
+
+pres_16 <- pres_16 %>%
+  mutate(`Republican Electoral` = replace(`Republican Electoral`, is.na(`Republican Electoral`), 0),
+         `Democrat Electoral` = replace(`Democrat Electoral`, is.na(`Democrat Electoral`), 0))
+# Hawaii splits electoral votes
+pres_16$`Democrat Electoral`[[12]] <- 3
+# Washington splits electoral votes
+pres_16$`Democrat Electoral`[[48]] <- 8
+# Texas splits electoral votes
+pres_16$`Republican Electoral`[[44]] <- 36
+
+pres_16 <- pres_16 %>%
+  dplyr::mutate(`Republican Electoral` = as.numeric(`Republican Electoral`),
+        `Democrat Electoral` =  as.numeric(`Democrat Electoral`))
+
+# Now we can add the electoral votes
+# Will need to fix Hawaii, Washington, and Texas
+pres_16 <- pres_16 %>%
+  group_by(school_state) %>%
+  dplyr::mutate(Electoral_Total = `Republican Electoral` + `Democrat Electoral`)
+
+# Hawaii has 4 electoral votes
+pres_16$Electoral_Total[[12]] <- 4
+# Washington has 12 electoral votes
+pres_16$Electoral_Total[[48]] <- 12
+# Texas has 38 electoral votes
+pres_16$Electoral_Total[[44]] <- 38
+
+# Now we will determine if the state's electoral votes went primarily to Republicans or democrats 
+pres_16 <- pres_16 %>% mutate(electoral_pct_dem = round(((`Democrat Electoral`/Electoral_Total)*100),2))
+
+# Now a new category of state party by electoral college. 
+pres_16 <- pres_16 %>% mutate(Political_Aff_2 = case_when(
+    electoral_pct_dem >= 50 ~ "Democrat",
+    TRUE ~ "Conservative"
+  ))
+
+state_party <- pres_16 %>% select(c("school_state", "Political_Affiliation", "Political_Aff_2"))
+
+```
+
+
+```{r}
+main$school_state[[54]] <- "New York"
+main$school_state[[136]] <- "California"
+main$school_state[[373]] <- "South Carolina"
+main$school_state[[377]] <- "Washington"
+
+
+regions <- regions %>% select(-"State_ID")
+regions <- regions %>% dplyr::rename(school_state = state.name)
+regions <- regions %>% dplyr::rename(school_region = state.region)
+regions <- regions %>% dplyr::rename(school_subregion = state.division)
+
+
+full_region <- left_join(main, regions, by = "school_state")
+
+full_region <- left_join(full_region, state_party, by = "school_state")
+
+full_region %>%
+  filter(school_state != "Puerto Rico") %>%
+  filter(locale != "") %>%
+  dplyr::group_by(school_region, locale) %>%
+  dplyr::summarize(counts = n()) %>%
+  ggplot(aes(x = reorder(locale, counts), y = counts, fill = school_region)) +
+  geom_col(position = "dodge") + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) + 
+  coord_flip() +
+  theme_minimal() +
+  labs(title = "Canopy Learning Environments by Region and Locale",
+       subtitle = "Schools with no locale data and \na from Puerto Rico is currently excluded",
+       x = "",
+       y = "")
+
+full_region %>%
+  filter(school_state != "Puerto Rico") %>%
+  filter(locale != "") %>%
+  dplyr::group_by(Political_Affiliation, locale) %>%
+  dplyr::summarize(counts = n()) %>%
+  ggplot(aes(x = reorder(locale, counts), y = counts, fill = Political_Affiliation)) +
+  geom_col(position = "dodge") + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) + 
+  coord_flip() +
+  theme_minimal() +
+  labs(title = "Canopy Learning Environments by Urbanicity and Political Leaning",
+       subtitle = "Schools with no locale data and \na school from Puerto Rico are currently excluded \nbased on 2016 Presidential Election Popular Vote",
+       x = "",
+       y = "")
+
+
+full_region %>%
+  filter(school_state != "Puerto Rico") %>%
+  filter(locale != "") %>%
+  dplyr::group_by(Political_Aff_2, locale) %>%
+  dplyr::summarize(counts = n()) %>%
+  ggplot(aes(x = reorder(locale, counts), y = counts, fill = Political_Aff_2)) +
+  geom_col(position = "dodge") + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) + 
+  coord_flip() +
+  theme_minimal() +
+  labs(title = "Canopy Learning Environments by Urbanicity and Political Leaning",
+       subtitle = "Schools with no locale data and \na school from Puerto Rico are currently excluded \nbased on 2016 Presidential Election Electoral Vote",
+       x = "",
+       y = "")
+
+
+full_region %>%
+  filter(school_state != "Puerto Rico") %>%
+  filter(locale != "") %>%
+  dplyr::group_by(Political_Aff_2, school_region) %>%
+  dplyr::summarize(counts = n()) %>%
+  ggplot(aes(x = reorder(school_region, counts), y = counts, fill = Political_Aff_2)) +
+  geom_col(position = "dodge") + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) + 
+  coord_flip() +
+  theme_minimal() +
+  labs(title = "Canopy Learning Environments by Political Leaning and Region",
+       subtitle = "Schools with no locale data and \na school from Puerto Rico are currently excluded \nbased on 2016 Presidential Election Electoral Vote",
+       x = "",
+       y = "")
+
+```
+
+
+```{r}
+
+full_region %>%
+  filter(school_state != "Puerto Rico") %>%
+  filter(locale != "") %>%
+  dplyr::group_by(school_subregion, locale) %>%
+  dplyr::summarize(counts = n()) %>%
+  ggplot(aes(x = reorder(locale, counts), y = counts, fill = school_subregion)) +
+  geom_col(position = "dodge") + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) + 
+  coord_flip() +
+  theme_minimal() +
+  labs(title = "Canopy Learning Environments by Sub Region \nand Locale",
+       subtitle = "Schools with no locale data and \na from Puerto Rico is currently excluded",
+       x = "",
+       y = "")
+
+
+
+
+```
+
+
+
+## Examining data to model   
+
+```{r desript plot}
+
+main %>%
+  filter(locale != "NA") %>%
+  group_by(locale) %>%
+ggplot(aes(x = wave, y = prac_tot )) +           
+  geom_bar(stat = "summary", fun = "mean", fill="cornflowerblue") + 
+  facet_grid(~locale) + 
+  theme_classic()+
+  labs(y = "Total Practices", x = "Wave")
+
+
+```
+
+### Descriptive Table  
+
+```{r descriptive table}
+
+datatable(round(describe(main[5:19], fast = TRUE, ranges = FALSE), digits = 2))
+
+```
+
+### Distribution: 
+
+```{r practice distribution}
+main %>%
+  ggplot(aes(x = prac_tot)) +
+  geom_bar(fill= "darkorchid2") +
+  theme_minimal()
+
+
+
+```
+
+## Missing Data  
+
+Here we are running an MCAR test to examing to see if the missing data for locale, free and reduced price lunch, and percent bipoc is missing at random. If it is at random then we will continue as planned. If not, we will use imputed data.
+
+```{r missing, warning=FALSE}
+
+ 
+main$cbipoc_percent <- c(scale(main$bipoc_percent,  center=TRUE, scale=TRUE)) 
+main$cfrpl_percent <- c(scale(main$frpl_percent,  center=TRUE, scale=TRUE))
+
+main_mcar <- main %>%
+  select(wave, frpl_percent, locale, bipoc_percent, prac_tot)
+
+main_mcar$locale <- as.numeric(main_mcar$locale)
+
+mcar_test(main_mcar)
+
+
+
+
+```
+
+There is a difference between complete cases and partial cases. Code complete and partial data and run t tests to try to predict difference between cases. If there is a mean difference, we should add that as a control in the model. 
+
+Attrition analysis: examine schools that participated over all 3 waves
+Examine means test of the two groups and report that.
+
+**Only impute data if missing completely at random**
+
+In this case though, because we know the reason for why it is missing might make sense. 
+
+### Examining mean differences  
+
+```{r mean differences}
+
+## Setting up the groups(Complete and incomplete data to examine mean differences)
+main_complete <- main %>%
+  filter(bipoc_percent != "NA" & frpl_percent != "NA" & locale != "NA")%>%
+  mutate(group = 1) # schools with complete data are coded 1
+
+main_miss <- main %>%
+  filter(is.na(bipoc_percent) | is.na(frpl_percent) | is.na(locale))%>%
+  mutate(group=0) # schools with missing data are coded 0
+
+main_test <- full_join(main_complete, main_miss) # rejoining the data
+
+main_test$group <- as.factor(main_test$group) 
+
+## Testing the mean difference in total practices for complete and incomplete school data
+t.test(prac_tot ~ group, data = main_test)
+
+# This suggests that the difference in practice total is not significant between school groups.
+
+# To double check because our data is not exactly normal, here is the wilcox test
+wilcox.test(prac_tot ~ group, data = main_test)
+
+# Is in agreement with Welch's test that the difference in practice totals is not significant
+
+## Examining the locale data for missing and complete school data
+locale_count_complete <- main_test %>% filter(group == 1) %>% dplyr::count(locale)
+locale_count_complete$prct_locale <- round((locale_count_complete$n/442)*100,digits = 2)
+datatable(locale_count_complete) # Percent of each locale for complete schools data 
+
+locale_count_miss <- main_test %>% filter(group == 0) %>% dplyr::count(locale)
+locale_count_miss$prct_locale <- round((locale_count_miss$n/124)*100, digits = 2)
+datatable(locale_count_miss) # percent of each locale for incomplete schools data
+
+
+main_test$locale <- as.numeric(main_test$locale) # need to change locale to a factor to examine the difference here.
+
+t.test(locale ~ group, data = main_test)
+# Suggests that the difference in location is significant by locale between the complete and incomplete data
+
+wilcox.test(locale ~ group, data = main_test)
+# It does seem like the groups differ by percent of locale missing. 
+
+
+
+```
+Based on an examination of the mean differences between groups of complete data schools and missing data schools, it seems like there is no difference in the mean total practices of schools with missing frpl and bipoc data compared to schools with complete data. 
+
+When examining the location data, there is a difference between complete data schools and missing data schools with regard to location data. Complete data schools had a higher percentage of rural schools (25% to 14% in the missing data group) as well as a higher percentage of suburban schools (19% to 17%). Alternatively, the missing data group had a higher percentage of urban schools (65% compared to 56% of Urban schools in the complete data group).
+
+
+## Fixed Effects  
+
+This is how he did assignment 3 where we first examined if practices changed overtime in general without any predictors. 
+
+```{r conditional, warning=FALSE, message=FALSE}
+
+
+
+GLMMCond <- glmer(prac_tot ~ 1 + wave + (1|school_id), 
+                  family = poisson, 
+                  data = main) 
+summary(GLMMCond)
+tab_model(GLMMCond)
+
+```
+
+**ICC: 0.29**
+
+Total observations 566 (Before we have missing data in the predictors)
+
+In this case, wave does seem to be significant. 
+
+## Model with predictors  
+
+Here we are adding in locale, percent bipoc, and percent frpl as predictors in our model. 
+
+```{r predictors, warning=FALSE, message=FALSE}
+
+GLMMfix <- glmer(prac_tot ~ 1 + wave + locale + cbipoc_percent + cfrpl_percent + (1|school_id), 
+                  family = poisson, 
+                  data = main) 
+
+## No interaction term here
+summary(GLMMfix)
+tab_model(GLMMfix)
+```
+
+### Model check Conditional 
+Is this any better than the unconditional model? 
+
+```{r conditional check, warning=FALSE, message=FALSE}
+
+AIC(GLMMCond,GLMMfix)
+BIC(GLMMCond,GLMMfix)
+
+# Cannot test comparison because different proportion of missing data between the models.
+# test_lrt(GLMMCond,GLMMfix) 
+
+```
+
+The model with predictors is better than the conditional model according to the AIC and BIC. 
+
+## Model Interactions   
+**Locale x Wave**    
+
+The previous model did not have an interaction effect. In this model we have the interaction between wave and locale but not of percent bipoc and percent frpl.  
+
+
+```{r interaction, warning=FALSE, message=FALSE}
+
+
+GLMMfix1 <- glmer(prac_tot ~ 1 + wave + 
+                    locale + 
+                    cbipoc_percent + 
+                    cfrpl_percent + 
+                    locale*wave +
+                    (1|school_id), 
+                  family = poisson, 
+                  data = main) 
+summary(GLMMfix1)
+tab_model(GLMMfix1)
+
+
+```
+
+**ICC: 0.20**
+
+**Marginal R^2: 0.235 (23.5% of variance explained)**
+
+**Conditional R^2: 0.388 (38.8% of variance explained)**
+
+In this model it seems like the interaction between wave and urban location was significant but not for suburban and wave. 
+
+### Model check Interaction   
+Is this any better than the model without the interaction term? 
+
+```{r interaction check, warning=FALSE, message=FALSE}
+
+AIC(GLMMfix,GLMMfix1)
+BIC(GLMMfix,GLMMfix1)
+
+  
+test_lrt(GLMMfix,GLMMfix1) 
+
+```
+
+Based on AIC and BIC the model without the interaction term is a better model but barely, it is so very very close: p = 0.051.  
+
+## Predictors of growth  
+
+Here we add a model with interaction effects between not only locale but percent bipoc and percent frpl as well.  
+
+```{r interactions, warning=FALSE, message=FALSE}
+
+GLMMfix2 <- glmer(prac_tot ~ 1 + wave + 
+                    locale + 
+                    cbipoc_percent + 
+                    cfrpl_percent + 
+                    locale*wave +
+                    cbipoc_percent*wave +
+                    cfrpl_percent*wave +
+                    (1|school_id), 
+                  family = poisson, 
+                  data = main) 
+summary(GLMMfix2)
+
+## Model failed to converge with optimizer. Can check afix package for optimizers later.
+
+```
+
+
+### Model check Interactions   
+**Interaction: Wave X Locale , Wave X Percent FRPL , Wave X Percent BIPOC**
+
+```{r interactions check, warning=FALSE, message=FALSE}
+
+AIC(GLMMfix1,GLMMfix2)
+BIC(GLMMfix1,GLMMfix2)
+
+test_lrt(GLMMfix1,GLMMfix2)
+
+```
+
+The second model does not seem to be better which would make sense given that we likely wouldn't expect percent frpl and percent bipoc to change significantly in a short timeframe and adding the interactions of those two with wave increased our degrees of freedom.
+
+# Plots  
+
+**Not using a model**
+```{r, warning=FALSE, message=FALSE}
+localegg <- summarySE(na.omit(main), measurevar="prac_tot", groupvars=c("locale","wave")) 
+
+localegg$wave<-as.numeric(localegg$wave)
+
+# The errorbars overlapped, so use position_dodge to move them horizontally
+pd <- position_dodge(0.1) # move them .05 to the left and right
+
+# Use 95% confidence interval instead of SEM
+
+ggplot(localegg, aes(x=wave, y=prac_tot, color=locale)) + 
+  geom_errorbar(aes(ymin=prac_tot-ci, ymax=prac_tot+ci), width=.1, position=pd) +
+  ylab("Total Practices") +
+  ylim(0,9) +
+  geom_line(position=pd) +
+  geom_point(position=pd) + theme_classic() + 
+  scale_color_manual(values=c("cornflowerblue", "chocolate1", "darkorchid2")) +
+  ggtitle("Locale x Group By Time with 95% Mean CIs") +
+  theme(plot.title = element_text(hjust = 0.5, lineheight=.8, face="bold"))
+  
+
+```
+
+
+```{r, fig.height=8, fig.width=10, warning = FALSE, message=FALSE}
+localegg2 <- summarySE(na.omit(full_region), measurevar="prac_tot", groupvars=c("locale","wave", "school_region")) 
+
+localegg2$wave<-as.numeric(localegg2$wave)
+
+# Use 95% confidence interval instead of SEM
+
+ggplot(localegg2, aes(x=wave, y=prac_tot, color=locale)) + 
+  geom_errorbar(aes(ymin=prac_tot-ci, ymax=prac_tot+ci), width=.1, position=pd) +
+  ylab("Total Practices") +
+  ylim(0,9) +
+  facet_wrap(~school_region) +
+  geom_line(position=pd) +
+  geom_point(position=pd) + theme_classic() + 
+  scale_color_manual(values=c("cornflowerblue", "chocolate1", "darkorchid2")) +
+  ggtitle("Locale x Group x Region \nBy Time with 95% Mean CIs") +
+  theme(plot.title = element_text(hjust = 0.5, lineheight=.8, face="bold"))
+```
+
+```{r, fig.height=10, fig.width=10, warning=FALSE, message=FALSE}
+localegg3 <- summarySE(na.omit(full_region), measurevar="prac_tot", groupvars=c("locale","wave", "school_subregion")) 
+
+localegg3$wave<-as.numeric(localegg3$wave)
+
+# Use 95% confidence interval instead of SEM
+
+ggplot(localegg3, aes(x=wave, y=prac_tot, color=locale)) + 
+  geom_errorbar(aes(ymin=prac_tot-ci, ymax=prac_tot+ci), width=.1, position=pd) +
+  ylab("Total Practices") +
+  ylim(0,9) +
+  facet_wrap(~school_subregion) +
+  geom_line(position=pd) +
+  geom_point(position=pd) + theme_classic() + 
+  scale_color_manual(values=c("cornflowerblue", "chocolate1", "darkorchid2")) +
+  ggtitle("Locale x Group X Sub Region \nBy Time with 95% Mean CIs") +
+  theme(plot.title = element_text(hjust = 0.5, lineheight=.8, face="bold"))
+```
+
+
+## No Interaction Model  
+
+```{r, warning=FALSE, message=FALSE}
+plot_model(GLMMfix) + theme_classic () 
+
+plot_model(GLMMfix,type = "eff")$wave + theme_classic () # plot the effect of Time (Wave) 
+
+plot_model(GLMMfix,type = "eff")$locale + theme_classic () # plot the effect of locale 
+ 
+interact_plot(model=GLMMfix, pred = wave, modx = locale)+
+  labs(x = "Wave", y = "Total Social Justice Practices") # Enter the predictor of growth in the final model 
+```
+
+
+## Interaction Model
+
+```{r, warning=FALSE, message=FALSE}
+plot_model(GLMMfix1) + theme_classic () 
+
+plot_model(GLMMfix1,type = "eff")$wave + theme_classic () # plot the effect of Time (Wave) 
+
+plot_model(GLMMfix1,type = "eff")$locale + theme_classic () # plot the effect of locale 
+ 
+interact_plot(model=GLMMfix1, pred = wave, modx = locale) +
+  labs(x = "Wave", y = "Total Social Justice Practices")
+# Enter the predictor of growth in the final model 
+```
+
+
+
+# Tab Models  
+
+## No interaction Model  
+**Using the Predictor model with no interaction term**
+Rated as the best model based on test of fit and BIC.  
+
+```{r tab model pred}
+
+tab_model(GLMMfix)
+
+```
+
+## Interaction Model  
+**Using the Predictor model with an interaction term between Locale X Wave**
+Better according to AIC  
+
+```{r tab model inter}
+
+tab_model(GLMMfix1)
+
+```
+
+
+# Imputed Data
+
+If needed, here is the model with imputed data, if the MCAR test determines that the missing data is not at random. 
+
+## Missing data  
+**Examines the missing data in the main dataset**  
+
+```{r}
+library(lmerTest)
+library(mice)
+library(broom.mixed)
+library(mitml)
+
+main_missing <- main %>% select(school_name, school_state, prac_tot, wave, bipoc_percent, frpl_percent, locale)
+md.pattern(main_missing, rotate.names = T)
+
+
+```
+
+Tells us where the missing data. 442 complete observations.
+
+## Imputed data
+This is the imputed data that tries to compensate for the missing data. Although our missing data is not completely at random, we are going to run the model to compare.  
+
+```{r, warning=FALSE, message=FALSE}
+#Someone online suggested this package to impute data
+
+#### Impute ####
+imp <- mice(main,
+            m=5)
+
+#### Fit With Imputations ####
+fit <- with(imp,
+            glmer(prac_tot ~ wave + locale +
+                   cbipoc_percent+
+                   cfrpl_percent+
+                   (1|school_id)))
+
+#### Pool and Summarise ####
+pool <- pool(fit)
+summary(pool)
+
+#### Load Library and Get All Estimates ####
+testEstimates(as.mitml.result(fit),
+              extra.pars = T)
+```
+
+Compare imputed model and out model (missing data)
+
+
+# State Level Data  
+
+## Examining State Data  
+
+Frequency counts of schools by state over the years.  
+
+```{r}
+
+main$school_state[373] <- "South Carolina"
+main$school_state[136] <- "California"
+main$school_state[377] <- "Washington"
+main$school_state[54] <- "New York"
+
+main_count <- main %>%
+  filter(school_state != "NA") %>%
+  group_by(year) %>%
+  dplyr::count(school_state)
+
+
+main_count %>%
+  filter(school_state != "")%>%
+  group_by("year")%>%
+  ggplot(aes(x = n, y = reorder(school_state, n)))+
+  geom_col(aes(fill= school_state), show.legend = FALSE) +
+  scale_fill_viridis_d(option = "magma", direction = -1)+
+  labs(x = "Number of Schools", y = "")+
+  facet_wrap(~year, nrow = 1)+
+  theme_minimal()
+
+
+```
+
+
+Interestingly, Colorado, California, Michigan, New York, and Texas are consistently in the top 5 for innovative schools across the years.  
+
+## State Random Model  
+
+After examining the data by states, we decided to allow the state data to vary with random intercepts.  
+
+```{r state vary}
+
+
+GLMMRand1 <- glmer(prac_tot ~ 1 + wave + 
+                    locale + 
+                    cbipoc_percent + 
+                    cfrpl_percent + 
+                    locale*wave +
+                    (1|school_id) +
+                     (1|school_state), 
+                  family = poisson, 
+                  data = main) 
+summary(GLMMRand1)
+tab_model(GLMMRand1)
+
+```
+
+
+
+```{r random check, warning=FALSE, message=FALSE}
+
+AIC(GLMMfix1,GLMMRand1)
+BIC(GLMMfix1,GLMMRand1)
+
+test_lrt(GLMMfix1,GLMMRand1)
+
+```
+
+
+Although AIC and BIC are essnetially the same, the Random effects model is considered significantly better using the LRT test.  
+
+But let's see if we can account for starting points.  
+
+```{r}
+schools_2018_19 <- import(here("data/schools_2018-19.csv"))
+
+```
+
+
+Look at school type (Public/private), charter, magnet.  
+
+Include "level" - aka high school, elementary, middle, middle/high school  
+
+title 1 status - "title_i_status"
+
+```{r state varies}
+
+
+GLMMRand2 <- glmer(prac_tot ~ 1 + wave + 
+                    locale + 
+                    cbipoc_percent + 
+                    cfrpl_percent + 
+                    locale*wave +
+                    (1|school_id) +
+                     (1|school_state), 
+                  family = poisson, 
+                  data = main) 
+summary(GLMMRand2)
+tab_model(GLMMRand2)
+
+```
+
+
+
+# Model Summary   
+**No State Level Control**  
+
+```{r}
+modelsummary::msummary(list(
+  "Null Model" = GLMMCond, 
+  "Model 1" = GLMMfix,
+  "Model 2" = GLMMfix1,
+  "Model 3" = GLMMRand1), 
+  stars = TRUE)
+```
+
