@@ -18,7 +18,9 @@ library(psych)
 library(rio)
 library(tidyverse)
 library(DT)
+library(readr)
 load(here("data", "updated-canopy-schools.Rdata"))
+pres_16 <- read_csv(here("data/prez_election_16.csv"))
 ```
 
 # Descriptives
@@ -114,7 +116,6 @@ Adding in regional data
 ```{r}
 library(datasets)
 
-pres_16 <- import("~/Desktop/prez_election_16.csv")
 
 # Region
 ######################################
