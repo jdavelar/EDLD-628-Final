@@ -4459,8 +4459,8 @@ value.</p>
 <pre><code>## `summarise()` has grouped output by &#39;year&#39;. You can override using the
 ## `.groups` argument.</code></pre>
 <pre class="r"><code>datatable(loc_desc)</code></pre>
-<div class="datatables html-widget html-fill-item-overflow-hidden html-fill-item" id="htmlwidget-1d30c73a88ea557b67ee" style="width:100%;height:auto;"></div>
-<script type="application/json" data-for="htmlwidget-1d30c73a88ea557b67ee">{"x":{"filter":"none","vertical":false,"data":[["1","2","3","4","5","6","7","8","9","10","11","12","13","14","15","16","17"],["2019","2019","2019","2019","2021","2021","2021","2021","2022","2022","2022","2022","2023","2023","2023","2023","2023"],["","Rural","Suburban","Urban","","Rural","Suburban","Urban","Rural","Suburban","Urban",null," Suburban","Rural","Suburban","Urban",null],[1,41,38,93,3,55,39,135,33,28,98,2,32,53,7,156,3]],"container":"<table class=\"display\">\n  <thead>\n    <tr>\n      <th> <\/th>\n      <th>year<\/th>\n      <th>locale<\/th>\n      <th>N<\/th>\n    <\/tr>\n  <\/thead>\n<\/table>","options":{"columnDefs":[{"className":"dt-right","targets":3},{"orderable":false,"targets":0}],"order":[],"autoWidth":false,"orderClasses":false}},"evals":[],"jsHooks":[]}</script>
+<div class="datatables html-widget html-fill-item-overflow-hidden html-fill-item" id="htmlwidget-f4397f167de129fdddaa" style="width:100%;height:auto;"></div>
+<script type="application/json" data-for="htmlwidget-f4397f167de129fdddaa">{"x":{"filter":"none","vertical":false,"data":[["1","2","3","4","5","6","7","8","9","10","11","12","13","14","15","16","17"],["2019","2019","2019","2019","2021","2021","2021","2021","2022","2022","2022","2022","2023","2023","2023","2023","2023"],["","Rural","Suburban","Urban","","Rural","Suburban","Urban","Rural","Suburban","Urban",null," Suburban","Rural","Suburban","Urban",null],[1,41,38,93,3,55,39,135,33,28,98,2,32,53,7,156,3]],"container":"<table class=\"display\">\n  <thead>\n    <tr>\n      <th> <\/th>\n      <th>year<\/th>\n      <th>locale<\/th>\n      <th>N<\/th>\n    <\/tr>\n  <\/thead>\n<\/table>","options":{"columnDefs":[{"className":"dt-right","targets":3},{"orderable":false,"targets":0}],"order":[],"autoWidth":false,"orderClasses":false}},"evals":[],"jsHooks":[]}</script>
 </div>
 <div id="updated-boxplots-for-frpl-bipoc-percentages" class="section level2">
 <h2>Updated boxplots for FRPL &amp; BIPOC percentages</h2>
@@ -4647,11 +4647,7 @@ full_region$school_state[[667]] &lt;- &quot;Florida&quot;
 full_region$school_state[[632]] &lt;- &quot;District of Columbia&quot;
 
 
-table(full_region$locale)</code></pre>
-<pre><code>## 
-##  Suburban     Rural  Suburban     Urban 
-##        32       182       112       482</code></pre>
-<pre class="r"><code>full_region$locale &lt;- fct_collapse(full_region$locale, &quot;Suburban&quot; = c(&quot;Suburban&quot;, &quot;Suburban&quot;))</code></pre>
+full_region$locale &lt;- fct_collapse(full_region$locale, &quot;Suburban&quot; = c(&quot;Suburban&quot;, &quot;Suburban&quot;))</code></pre>
 </div>
 </div>
 <div id="descriptive-data" class="section level1">
@@ -4742,8 +4738,8 @@ ggplot(aes(x = wave, y = prac_tot )) +
 <div id="descriptive-table" class="section level2">
 <h2>Descriptive Table</h2>
 <pre class="r"><code>datatable(round(describe(full_region[5:19], fast = TRUE, ranges = FALSE), digits = 2))</code></pre>
-<div class="datatables html-widget html-fill-item-overflow-hidden html-fill-item" id="htmlwidget-39d558cb2b0c9562ed48" style="width:100%;height:auto;"></div>
-<script type="application/json" data-for="htmlwidget-39d558cb2b0c9562ed48">{"x":{"filter":"none","vertical":false,"data":[["prac_culture","prac_sel_assess","prac_community","prac_mental","prac_restorative","prac_marginalized","prac_sel_curriculum","prac_sel_integrated","prac_resources","locale","frpl_percent","bipoc_percent","year","wave","pre_covid"],[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15],[817,817,817,817,817,817,817,817,817,808,693,718,817,817,817],[0.65,0.64,0.6,0.67,0.67,0.65,0.42,0.68,0.45,null,53.13,58.14,null,2.39,0.21],[0.48,0.48,0.49,0.47,0.47,0.48,0.49,0.47,0.5,null,30.03,33.1,null,1.46,0.41],[0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,null,1.14,1.24,null,0.05,0.01]],"container":"<table class=\"display\">\n  <thead>\n    <tr>\n      <th> <\/th>\n      <th>vars<\/th>\n      <th>n<\/th>\n      <th>mean<\/th>\n      <th>sd<\/th>\n      <th>se<\/th>\n    <\/tr>\n  <\/thead>\n<\/table>","options":{"columnDefs":[{"className":"dt-right","targets":[1,2,3,4,5]},{"orderable":false,"targets":0}],"order":[],"autoWidth":false,"orderClasses":false}},"evals":[],"jsHooks":[]}</script>
+<div class="datatables html-widget html-fill-item-overflow-hidden html-fill-item" id="htmlwidget-90aeb949e7a329785662" style="width:100%;height:auto;"></div>
+<script type="application/json" data-for="htmlwidget-90aeb949e7a329785662">{"x":{"filter":"none","vertical":false,"data":[["prac_culture","prac_sel_assess","prac_community","prac_mental","prac_restorative","prac_marginalized","prac_sel_curriculum","prac_sel_integrated","prac_resources","locale","frpl_percent","bipoc_percent","year","wave","pre_covid"],[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15],[817,817,817,817,817,817,817,817,817,808,693,718,817,817,817],[0.65,0.64,0.6,0.67,0.67,0.65,0.42,0.68,0.45,null,53.13,58.14,null,2.39,0.21],[0.48,0.48,0.49,0.47,0.47,0.48,0.49,0.47,0.5,null,30.03,33.1,null,1.46,0.41],[0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,null,1.14,1.24,null,0.05,0.01]],"container":"<table class=\"display\">\n  <thead>\n    <tr>\n      <th> <\/th>\n      <th>vars<\/th>\n      <th>n<\/th>\n      <th>mean<\/th>\n      <th>sd<\/th>\n      <th>se<\/th>\n    <\/tr>\n  <\/thead>\n<\/table>","options":{"columnDefs":[{"className":"dt-right","targets":[1,2,3,4,5]},{"orderable":false,"targets":0}],"order":[],"autoWidth":false,"orderClasses":false}},"evals":[],"jsHooks":[]}</script>
 </div>
 <div id="missing-data" class="section level2">
 <h2>Missing Data</h2>
@@ -4951,13 +4947,13 @@ and bipoc data compared to schools with complete data.</p>
 locale_count_complete &lt;- full_mean_test %&gt;% filter(group == 1) %&gt;% dplyr::count(locale)
 locale_count_complete$prct_locale &lt;- round((locale_count_complete$n/676)*100,digits = 2)
 datatable(locale_count_complete) # Percent of each locale for complete schools data </code></pre>
-<div class="datatables html-widget html-fill-item-overflow-hidden html-fill-item" id="htmlwidget-4e21f9b856dc8eb05976" style="width:100%;height:auto;"></div>
-<script type="application/json" data-for="htmlwidget-4e21f9b856dc8eb05976">{"x":{"filter":"none","vertical":false,"data":[["1","2","3","4"],[" Suburban","Rural","Suburban","Urban"],[29,161,91,395],[4.29,23.82,13.46,58.43]],"container":"<table class=\"display\">\n  <thead>\n    <tr>\n      <th> <\/th>\n      <th>locale<\/th>\n      <th>n<\/th>\n      <th>prct_locale<\/th>\n    <\/tr>\n  <\/thead>\n<\/table>","options":{"columnDefs":[{"className":"dt-right","targets":[2,3]},{"orderable":false,"targets":0}],"order":[],"autoWidth":false,"orderClasses":false}},"evals":[],"jsHooks":[]}</script>
+<div class="datatables html-widget html-fill-item-overflow-hidden html-fill-item" id="htmlwidget-cfb8e7761028838f9fcb" style="width:100%;height:auto;"></div>
+<script type="application/json" data-for="htmlwidget-cfb8e7761028838f9fcb">{"x":{"filter":"none","vertical":false,"data":[["1","2","3","4"],[" Suburban","Rural","Suburban","Urban"],[29,161,91,395],[4.29,23.82,13.46,58.43]],"container":"<table class=\"display\">\n  <thead>\n    <tr>\n      <th> <\/th>\n      <th>locale<\/th>\n      <th>n<\/th>\n      <th>prct_locale<\/th>\n    <\/tr>\n  <\/thead>\n<\/table>","options":{"columnDefs":[{"className":"dt-right","targets":[2,3]},{"orderable":false,"targets":0}],"order":[],"autoWidth":false,"orderClasses":false}},"evals":[],"jsHooks":[]}</script>
 <pre class="r"><code>locale_count_miss &lt;- full_mean_test %&gt;% filter(group == 0) %&gt;% dplyr::count(locale)
 locale_count_miss$prct_locale &lt;- round((locale_count_miss$n/141)*100, digits = 2)
 datatable(locale_count_miss) # percent of each locale for incomplete schools data</code></pre>
-<div class="datatables html-widget html-fill-item-overflow-hidden html-fill-item" id="htmlwidget-678041641fa190dd941c" style="width:100%;height:auto;"></div>
-<script type="application/json" data-for="htmlwidget-678041641fa190dd941c">{"x":{"filter":"none","vertical":false,"data":[["1","2","3","4","5"],[" Suburban","Rural","Suburban","Urban",null],[3,21,21,87,9],[2.13,14.89,14.89,61.7,6.38]],"container":"<table class=\"display\">\n  <thead>\n    <tr>\n      <th> <\/th>\n      <th>locale<\/th>\n      <th>n<\/th>\n      <th>prct_locale<\/th>\n    <\/tr>\n  <\/thead>\n<\/table>","options":{"columnDefs":[{"className":"dt-right","targets":[2,3]},{"orderable":false,"targets":0}],"order":[],"autoWidth":false,"orderClasses":false}},"evals":[],"jsHooks":[]}</script>
+<div class="datatables html-widget html-fill-item-overflow-hidden html-fill-item" id="htmlwidget-6bce96667ce9997448e8" style="width:100%;height:auto;"></div>
+<script type="application/json" data-for="htmlwidget-6bce96667ce9997448e8">{"x":{"filter":"none","vertical":false,"data":[["1","2","3","4","5"],[" Suburban","Rural","Suburban","Urban",null],[3,21,21,87,9],[2.13,14.89,14.89,61.7,6.38]],"container":"<table class=\"display\">\n  <thead>\n    <tr>\n      <th> <\/th>\n      <th>locale<\/th>\n      <th>n<\/th>\n      <th>prct_locale<\/th>\n    <\/tr>\n  <\/thead>\n<\/table>","options":{"columnDefs":[{"className":"dt-right","targets":[2,3]},{"orderable":false,"targets":0}],"order":[],"autoWidth":false,"orderClasses":false}},"evals":[],"jsHooks":[]}</script>
 <pre class="r"><code>full_mean_test$locale &lt;- as.numeric(full_mean_test$locale) # need to change locale to a factor to examine the difference here.
 
 t.test(locale ~ group, data = full_mean_test)</code></pre>

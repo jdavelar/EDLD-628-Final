@@ -263,9 +263,8 @@ full_region$school_state[[667]] <- "Florida"
 full_region$school_state[[632]] <- "District of Columbia"
 
 
-table(full_region$locale)
-
 full_region$locale <- fct_collapse(full_region$locale, "Suburban" = c("Suburban", "Suburban"))
+
 ```
 
 # Descriptive Data  
