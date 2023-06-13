@@ -443,7 +443,7 @@ merge_2023 <- import(here("data", "schools_2022-23.csv")) %>%
     #locale using existing variables
     locale = case_when(
       self_reported_locale_rural == 1 ~ "Rural",
-      self_reported_locale_suburban == 1 ~" Suburban",
+      self_reported_locale_suburban == 1 ~ "Suburban",
       self_reported_locale_urban == 1 ~ "Urban"),
     locale = case_when(
       #over write with manual recode where locale == multiple using NCES ID
@@ -484,7 +484,9 @@ schools_2023 = merge_2023
 #merge data
 main <- main %>% 
   full_join(merge_2023, by = c("nces_id", "school_id", "year", "wave", "school_name", "school_state", "locale", "frpl_percent", "bipoc_percent", "prac_culture", "prac_sel_assess", "prac_community", "prac_mental", "prac_restorative", "prac_marginalized", "prac_sel_curriculum", "prac_sel_integrated", "prac_resources")) %>% 
-  mutate(pre_covid = ifelse(wave == 0, 1, 0))
+  mutate(pre_covid = ifelse(wave == 0, 1, 0),
+         locale = na_if(locale, ""),
+         locale = factor(locale, levels = c("Rural", "Urban", "Suburban"), exclude = NULL))
 # save new dataset
 # save(main, schools_2019, schools_2021, schools_2022, schools_2023,
 #      file = "updated-canopy-schools.RData")

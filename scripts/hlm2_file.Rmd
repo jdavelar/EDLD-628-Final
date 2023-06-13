@@ -52,9 +52,19 @@ bipoc_viz <- ggplot(main, aes(year, bipoc_percent, group = year)) +
   geom_boxplot() + 
   theme_minimal()
 # save(bipoc_viz, file = "bipoc_viz-updated.png")
-
-
 ```
+
+## States represented
+
+```{r states in full samp}
+state_rep <- main %>% 
+  mutate(rate = rep(1, nrow(.))) %>% 
+  group_by(school_state) %>% 
+  dplyr::summarize(n = sum(rate))
+datatable(state_rep)
+#missing: Montana, Nebraska, Oregon, West Virginia
+```
+
 
 ## Average implementation across years by locale
 
@@ -84,10 +94,9 @@ Should recreate the plots above with regional data
 
 Adding in total practices per year. 
 ```{r}
-
 main$prac_tot <- rowSums(main[c(5,6,7,8,9,10,11,12,13)], na.rm=TRUE)
-
-main <- main %>% mutate_at(c('locale'), ~na_if(.,''))
+# fixed dataset should make this redundant
+# main <- main %>% mutate_at(c('locale'), ~na_if(.,''))
 
 main$locale <- as.factor(main$locale)
 ```
@@ -281,8 +290,8 @@ full_region %>%
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) + 
   coord_flip() +
   theme_minimal() +
-  labs(title = "Canopy Learning Environments by Region and Locale",
-       subtitle = "Schools with no locale data and \na from Puerto Rico is currently excluded",
+  labs(title = "Canopy Learning Environments\nby Region and Locale",
+       subtitle = "Note: Schools with missing urbanicity data and \nfrom Puerto Rico excluded",
        x = "",
        y = "",
        fill = "Region")
@@ -332,7 +341,12 @@ full_region %>%
        x = "",
        y = "",
        fill = "Political Affiliation")
-
+# J - adding quick table for paper
+tab_reg <- full_region %>% 
+  mutate(rate = rep(1, nrow(.))) %>% 
+  group_by(year, school_region) %>% 
+  dplyr::summarize(n = sum(rate))
+datatable(tab_reg)
 ```
 
 ## Dsitribution Plot by Year   
