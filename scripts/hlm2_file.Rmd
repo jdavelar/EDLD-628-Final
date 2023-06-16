@@ -508,6 +508,9 @@ library(performance)
 library(interactions) 
 library(modelsummary)
 
+# Let's make the rural south the reference since I hypothesize that they would have the least amount of social justice practices.
+full_region$school_region <- relevel(full_region$school_region, ref = "South")
+
 
 GLMMCond <- glmer(prac_tot ~ 1 + wave + (1|school_id), 
                   family = poisson, 
@@ -603,16 +606,14 @@ BIC(GLMMCond,GLMMfix, GLMMfix_inter, GLMMfix_covid)
 The model with the interaction term was not better than the fixed model but the AIC and BIC improved when adding the pre_covid time varying covariate.  
 
 ## Model Interactions   
-**Locale x Wave**
-**Locale X Region**  
+**Locale x Wave**  
+**Locale X Region**   
 **Region X Wave**  
 
 The previous model did have an interaction effect, but did not have the interaction of wave. In this model we have the interaction between wave and locale, wave and school region, and locale and school region but not of percent bipoc percent frpl, and pre_covid.  
 
-**That said, I don't think it is right. I am not sure how this should look.**  
 
 ```{r interaction, warning=FALSE, message=FALSE}
-
 
 GLMMfix_wave_inter <- glmer(prac_tot ~ 1 + wave + 
                     locale + 
@@ -631,6 +632,27 @@ tab_model(GLMMfix_wave_inter)
 
 
 ```
+
+### Examining pairs  
+
+```{r, include=FALSE}
+library(emmeans)
+
+pairs_glm_interaction_mod <- emmeans(GLMMfix_wave_inter, ~ school_region + locale + wave)
+
+
+# View the estimated marginal means
+print(pairs_glm_interaction_mod)
+
+# View the pairwise comparisons
+pairwise <- pairs(pairs_glm_interaction_mod)
+print(pairwise)
+
+
+
+```
+
+The comparisons show that there are a few differences, primarily between the urban south and the urban west (p = 0.0092), the urban south and suburban midwest (p = 0.013), and midwest rural vs midwest suburban (p = 0.0146).  
 
 ## Model check Interaction   
 Is this any better than the model without the interaction term? 
